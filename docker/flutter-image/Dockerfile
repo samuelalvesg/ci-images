@@ -5,7 +5,9 @@
 #   - Coolify: `FROM` base of the app Dockerfile, pulled from ghcr.io (the package must be public to pull without login).
 # Licensed under Apache-2.0 (see LICENSE). The Flutter SDK, Dart and the Ubuntu packages inside the image
 # keep their own licenses; this license covers only the files in this directory.
-FROM ubuntu:24.04
+# Pinned by digest (Dependabot proposes digest updates of the same tag); apt packages are not pinned on purpose: an old
+# package version leaves the archive when it is replaced, which would break the build.
+FROM ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852
 
 ARG FLUTTER_VERSION=3.47.5
 ARG FLUTTER_CHANNEL=stable
@@ -30,14 +32,15 @@ RUN set -eu; \
     manifest=/tmp/releases_linux.json; \
     curl -fsSL https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json -o "$manifest"; \
     archive=$(jq -r --arg v "$FLUTTER_VERSION" --arg c "$FLUTTER_CHANNEL" \
-        '.releases[] | select(.version==$v and .channel==$c) | .archive' "$manifest" | head -n1); \
+        'first(.releases[] | select(.version==$v and .channel==$c)) | .archive' "$manifest"); \
     sha=$(jq -r --arg v "$FLUTTER_VERSION" --arg c "$FLUTTER_CHANNEL" \
-        '.releases[] | select(.version==$v and .channel==$c) | .sha256' "$manifest" | head -n1); \
+        'first(.releases[] | select(.version==$v and .channel==$c)) | .sha256' "$manifest"); \
     [ -n "$archive" ] && [ -n "$sha" ] || { echo "Flutter $FLUTTER_VERSION ($FLUTTER_CHANNEL) not in the release manifest" >&2; exit 1; }; \
     curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/$archive" -o /tmp/flutter.tar.xz; \
-    echo "$sha  /tmp/flutter.tar.xz" | sha256sum -c -; \
+    printf '%s  %s\n' "$sha" /tmp/flutter.tar.xz > /tmp/flutter.sha256; \
+    sha256sum -c /tmp/flutter.sha256; \
     mkdir -p /sdks; tar -xJf /tmp/flutter.tar.xz -C /sdks; \
-    rm -f /tmp/flutter.tar.xz "$manifest"; \
+    rm -f /tmp/flutter.tar.xz /tmp/flutter.sha256 "$manifest"; \
     git config --system --add safe.directory '*'; \
     flutter precache --web; \
     flutter --version

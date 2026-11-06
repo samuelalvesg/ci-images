@@ -1,0 +1,6 @@
+# DL3008 (pin versions in apt-get install) is ignored on purpose: Ubuntu removes an old package version from the archive when it
+# publishes a newer one (including security fixes), so a pinned version breaks the build a few weeks later. Reproducibility comes
+# from the pinned base image digest, the pinned toolchain versions (Flutter, Rust, Android SDK, Gradle) and the published
+# `content-<hash>` and digest of each image.
+ignored:
+  - DL3008
