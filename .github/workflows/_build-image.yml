@@ -51,6 +51,7 @@ jobs:
       attestations: write
     outputs:
       image: ${{ steps.ref.outputs.image }}
+      skipped: ${{ steps.reuse.outputs.skip }}
     steps:
       - uses: actions/checkout@v4
 
@@ -82,6 +83,30 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # A push to main does not rebuild an image whose inputs did not change: the published image carries a
+      # `content-<hash>` tag, and if that tag already exists the build, tests and push are skipped. A manual run
+      # always rebuilds (it also picks up base-image updates, which the hash cannot see for ubuntu/dotnet bases).
+      - name: Content hash and reuse check
+        id: reuse
+        env:
+          CONTEXT: ${{ inputs.context }}
+          ARGS: ${{ inputs.build_args }}
+          VERSION: ${{ inputs.version }}
+          BASE: ${{ inputs.base_image_name != '' && format('ghcr.io/{0}/{1}:{2}', steps.ref.outputs.owner, inputs.base_image_name, inputs.version) || '' }}
+          REPO: ghcr.io/${{ steps.ref.outputs.owner }}/${{ inputs.name }}
+          CAN_SKIP: ${{ inputs.publish && github.event_name == 'push' }}
+        run: |
+          base_digest=""
+          if [ -n "$BASE" ]; then
+            base_digest="$(docker buildx imagetools inspect "$BASE" --format '{{.Manifest.Digest}}' 2>/dev/null || true)"
+          fi
+          hash="$( { find "$CONTEXT" -type f | LC_ALL=C sort | xargs sha256sum; printf '%s\n' "$ARGS" "$VERSION" "$base_digest"; } | sha256sum | cut -c1-16 )"
+          tag="$REPO:content-$hash"
+          skip=false
+          if [ "$CAN_SKIP" = "true" ] && docker buildx imagetools inspect "$tag" >/dev/null 2>&1; then skip=true; fi
+          { echo "hash=$hash"; echo "skip=$skip"; echo "tag=$tag"; } >> "$GITHUB_OUTPUT"
+          echo "content hash $hash - reuse published image: $skip" >> "$GITHUB_STEP_SUMMARY"
+
       - name: OCI labels
         id: labels
         uses: docker/metadata-action@v5
@@ -96,6 +121,7 @@ jobs:
             org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}/README.md
 
       - name: Build (local, for the smoke test)
+        if: steps.reuse.outputs.skip != 'true'
         uses: docker/build-push-action@v6
         with:
           context: ${{ inputs.context }}
@@ -109,11 +135,13 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ inputs.name }}-${{ inputs.version }}
 
       - name: Smoke test
+        if: steps.reuse.outputs.skip != 'true'
         env:
           IMAGE: ${{ steps.ref.outputs.image }}
         run: ${{ inputs.test_command }}
 
       - name: Lint Dockerfile
+        if: steps.reuse.outputs.skip != 'true'
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: ${{ inputs.context }}/Dockerfile
@@ -121,6 +149,7 @@ jobs:
 
       # Report only for now: base images carry unfixed CVEs that would block every publish.
       - name: Scan image for vulnerabilities
+        if: steps.reuse.outputs.skip != 'true'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           image-ref: ${{ steps.ref.outputs.image }}
@@ -131,7 +160,7 @@ jobs:
 
       - name: Push all tags
         id: push
-        if: inputs.publish
+        if: inputs.publish && steps.reuse.outputs.skip != 'true'
         uses: docker/build-push-action@v6
         with:
           context: ${{ inputs.context }}
@@ -139,7 +168,9 @@ jobs:
             ${{ inputs.build_args }}
             ${{ inputs.base_image_name != '' && format('BASE=ghcr.io/{0}/{1}:{2}', steps.ref.outputs.owner, inputs.base_image_name, inputs.version) || '' }}
           labels: ${{ steps.labels.outputs.labels }}
-          tags: ${{ steps.ref.outputs.tags }}
+          tags: |
+            ${{ steps.ref.outputs.tags }}
+            ${{ steps.reuse.outputs.tag }}
           push: true
           provenance: mode=max
           sbom: true
@@ -147,7 +178,7 @@ jobs:
 
       # Signed provenance needs a public repository (or an Enterprise plan); skipped silently otherwise.
       - name: Attest build provenance
-        if: inputs.publish && github.event.repository.private == false
+        if: inputs.publish && steps.reuse.outputs.skip != 'true' && github.event.repository.private == false
         uses: actions/attest-build-provenance@v2
         with:
           subject-name: ghcr.io/${{ steps.ref.outputs.owner }}/${{ inputs.name }}
@@ -155,7 +186,7 @@ jobs:
           push-to-registry: true
 
       - name: Summary
-        if: inputs.publish
+        if: inputs.publish && steps.reuse.outputs.skip != 'true'
         env:
           TAGS: ${{ steps.ref.outputs.tags }}
           DIGEST: ${{ steps.push.outputs.digest }}
@@ -165,7 +196,7 @@ jobs:
   # Proves the pushed image works as a `container:` of a job (HOME swapped, checkout owned by another uid).
   use-as-ci-container:
     needs: build
-    if: inputs.publish
+    if: inputs.publish && needs.build.outputs.skipped != 'true'
     runs-on: ubuntu-latest
     container:
       image: ${{ needs.build.outputs.image }}

@@ -10,6 +10,9 @@ run 'n=$(rustup toolchain list | grep nightly | cut -d" " -f1); rustup target li
   || { echo "FAIL: nightly + wasm32 target"; exit 1; }
 run 'flutter_rust_bridge_codegen --version && wasm-pack --version' || { echo "FAIL: FRB/wasm-pack"; exit 1; }
 run 'cd /tmp && cargo new --lib t -q && cd t && cargo build -q' || { echo "FAIL: trivial cargo build with swapped HOME"; exit 1; }
+# GitHub Actions checks the repository out as another user: git must not refuse it as "dubious ownership".
+run 'mkdir /t && git init -q /t && chown -R 1234:1234 /t && cd /t && git status --short >/dev/null' \
+  || { echo "FAIL: git rejects a repository owned by another user"; exit 1; }
 if [ "$mode" = "flutter" ]; then
   run 'flutter --version >/dev/null && command -v rustc >/dev/null' || { echo "FAIL: flutter missing in flutter-rust"; exit 1; }
   run 'wasm-opt --version && protoc --version && command -v protoc-gen-dart' || { echo "FAIL: wasm-opt/protoc/protoc-gen-dart"; exit 1; }
