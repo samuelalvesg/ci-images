@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       name:
-        description: Image name under ghcr.io/<owner>/ (flutter, rust, flutter-rust, dotnet)
+        description: Image name under ghcr.io/samuelalvesg/ (flutter, rust, flutter-rust, dotnet)
         required: true
         type: string
       version:

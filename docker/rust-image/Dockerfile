@@ -2,7 +2,7 @@
 # flutter_rust_bridge), plus flutter_rust_bridge_codegen and wasm-pack installed once instead of on every CI run.
 # `BASE` makes the same file produce two images:
 #   - rust:         BASE=ubuntu:24.04 (default), for Rust-only repositories
-#   - flutter-rust: BASE=ghcr.io/<owner>/flutter:<version>, the full web build chain (Flutter + Rust)
+#   - flutter-rust: BASE=ghcr.io/samuelalvesg/flutter:<version>, the full web build chain (Flutter + Rust)
 # Licensed under Apache-2.0 (see LICENSE); the toolchains inside keep their own licenses.
 ARG BASE=ubuntu:24.04
 FROM ${BASE}
