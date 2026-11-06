@@ -2,7 +2,8 @@ name: Reuse the pull request result (reusable)
 
 # A push to the default branch re-runs the CI that the merged pull request already ran. When the tree of the pushed commit is
 # identical to the tree of the pull request's last commit, and the CI of that commit succeeded, the same files were already
-# tested and the run can be skipped. Any doubt (no pull request, different tree, no green run, API error) means "do not reuse":
+# tested and the run can be skipped. When the trees differ only in files that the tests do not read (ignored_paths), the
+# result is reused as well. Any doubt (no pull request, other changed files, no green run, API error) means "do not reuse":
 # the caller's tests then run as usual.
 on:
   workflow_call:
@@ -15,6 +16,16 @@ on:
         description: Branch whose pushes may reuse a pull request result
         type: string
         default: main
+      ignored_paths:
+        description: >-
+          Files that the tests do not read, one shell pattern per line (* also matches /). A difference between the pull
+          request and the pushed commit that touches only these files does not prevent the reuse. The workflow_file is
+          never ignored.
+        type: string
+        default: |
+          docs/**
+          *.md
+          .github/workflows/**
     outputs:
       reuse:
         description: "'true' when the pushed commit was already tested by its pull request"
@@ -40,6 +51,7 @@ jobs:
           REF: ${{ github.ref }}
           WORKFLOW_FILE: ${{ inputs.workflow_file }}
           BRANCH: ${{ inputs.branch }}
+          IGNORED_PATHS: ${{ inputs.ignored_paths }}
         run: |
           set +e
           reuse=false; why="not a push to $BRANCH"
@@ -55,7 +67,31 @@ jobs:
               if [ -z "$head" ] || [ -z "$tree_main" ] || [ -z "$tree_pr" ]; then
                 why="could not read the commits of pull request #$pr"
               elif [ "$tree_main" != "$tree_pr" ]; then
-                why="tree differs from the last commit of pull request #$pr (the branch moved after it was tested)"
+                # The merge brought changes the pull request did not test. That is fine if none of them is a file the
+                # tests read. The compare API lists at most 300 files; a longer list is never reused.
+                files=$(gh api "repos/$REPO/compare/$head...$SHA" --paginate -q '.files[].filename' 2>/dev/null)
+                count=$(printf '%s\n' "$files" | grep -c .)
+                relevant=""
+                while IFS= read -r f; do
+                  [ -z "$f" ] && continue
+                  if [ "$f" = ".github/workflows/$WORKFLOW_FILE" ]; then relevant="$f"; break; fi
+                  ignored=false
+                  while IFS= read -r pattern; do
+                    [ -z "$pattern" ] && continue
+                    # shellcheck disable=SC2053
+                    if [[ "$f" == $pattern ]]; then ignored=true; break; fi
+                  done <<< "$IGNORED_PATHS"
+                  if [ "$ignored" = false ]; then relevant="$f"; break; fi
+                done <<< "$files"
+                if [ -z "$files" ] || [ "$count" -ge 300 ]; then
+                  why="tree differs from the last commit of pull request #$pr and the changed files could not be listed"
+                elif [ -n "$relevant" ]; then
+                  why="tree differs from the last commit of pull request #$pr (the branch moved after it was tested; e.g. $relevant)"
+                elif [ "${green:-0}" -lt 1 ]; then
+                  why="no successful $WORKFLOW_FILE run for the last commit of pull request #$pr"
+                else
+                  reuse=true; why="pull request #$pr (${head:0:7}) succeeded and the merge only added ignored files ($count)"
+                fi
               elif [ "${green:-0}" -lt 1 ]; then
                 why="no successful $WORKFLOW_FILE run for the last commit of pull request #$pr"
               else
