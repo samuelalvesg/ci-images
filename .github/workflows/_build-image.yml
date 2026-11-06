@@ -84,7 +84,7 @@ jobs:
 
       - name: OCI labels
         id: labels
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ steps.ref.outputs.owner }}/${{ inputs.name }}
           labels: |
