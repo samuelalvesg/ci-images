@@ -1,11 +1,25 @@
 version: 2
 updates:
+  # One grouped pull request per month for all actions, instead of one (full CI run) per action.
   - package-ecosystem: github-actions
     directory: /
-    schedule: { interval: weekly }
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 1
+    groups:
+      actions:
+        patterns: ["*"]
+  # Base images are pinned on purpose (Ubuntu LTS, .NET channel); only patch-level changes of the tag are proposed.
   - package-ecosystem: docker
     directory: /docker/flutter-image
-    schedule: { interval: weekly }
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 1
+    ignore:
+      - dependency-name: ubuntu
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
   - package-ecosystem: docker
     directory: /docker/dotnet-image
-    schedule: { interval: weekly }
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 1
+    ignore:
+      - dependency-name: "mcr.microsoft.com/dotnet/sdk"
+        update-types: ["version-update:semver-major"]

@@ -24,7 +24,8 @@ ENV PATH=/usr/local/cargo/bin:${PATH}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl git build-essential clang cmake pkg-config libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && git config --system --add safe.directory '*'
 
 RUN set -eu; \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain "$RUST_STABLE" \
