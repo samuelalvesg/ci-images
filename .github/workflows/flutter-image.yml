@@ -93,6 +93,40 @@ jobs:
       publish: ${{ needs.versions.outputs.publish == 'true' }}
       floating_tags: ${{ needs.versions.outputs.floating == 'true' }}
 
+  # Platform images built on flutter-rust. In pull requests flutter-rust is skipped, so these build on the version of it
+  # that is already published; on a publish run they wait for the new flutter-rust.
+  flutter-linux:
+    needs: [versions, flutter-rust]
+    if: ${{ !cancelled() && needs.versions.result == 'success' && needs.flutter-rust.result != 'failure' }}
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    uses: ./.github/workflows/_build-image.yml
+    with:
+      name: flutter-linux
+      version: ${{ needs.versions.outputs.flutter }}
+      context: docker/linux-image
+      base_image_name: flutter-rust
+      description: "Flutter + Rust + Linux desktop toolchain (GTK3, gstreamer, libsecret, appindicator) - Docker image to build Flutter apps for Linux in CI. Tags: X.Y.Z, X.Y, latest"
+      test_command: docker/linux-image/test.sh "$IMAGE"
+      publish: ${{ needs.versions.outputs.publish == 'true' }}
+      floating_tags: ${{ needs.versions.outputs.floating == 'true' }}
+      free_disk_space: true
+
+  flutter-android:
+    needs: [versions, flutter-rust]
+    if: ${{ !cancelled() && needs.versions.result == 'success' && needs.flutter-rust.result != 'failure' }}
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    uses: ./.github/workflows/_build-image.yml
+    with:
+      name: flutter-android
+      version: ${{ needs.versions.outputs.flutter }}
+      context: docker/android-image
+      base_image_name: flutter-rust
+      description: "Flutter + Rust + Android toolchain (JDK 17, SDK 36, NDK 28.2, Rust Android targets) - Docker image to build Flutter APKs and app bundles in CI. Tags: X.Y.Z, X.Y, latest"
+      test_command: docker/android-image/test.sh "$IMAGE"
+      publish: ${{ needs.versions.outputs.publish == 'true' }}
+      floating_tags: ${{ needs.versions.outputs.floating == 'true' }}
+      free_disk_space: true
+
   rust:
     needs: versions
     permissions: { contents: read, packages: write, id-token: write, attestations: write }

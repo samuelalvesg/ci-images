@@ -37,6 +37,10 @@ on:
         description: Image name whose :<version> tag is the BASE build argument (flutter-rust builds on flutter)
         type: string
         default: ""
+      free_disk_space:
+        description: Remove preinstalled toolchains from the runner before building (needed by the large Android image)
+        type: boolean
+        default: false
     outputs:
       image:
         value: ${{ jobs.build.outputs.image }}
@@ -54,6 +58,13 @@ jobs:
       skipped: ${{ steps.reuse.outputs.skip }}
     steps:
       - uses: actions/checkout@v7
+
+      # A standard ubuntu-latest runner has about 14 GB free; the Android image (base + SDK + NDK + build cache) needs more.
+      - name: Free disk space
+        if: inputs.free_disk_space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
+          df -h / | tail -1
 
       - name: Resolve image reference and tags
         id: ref
