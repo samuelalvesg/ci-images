@@ -35,11 +35,12 @@ RUN set -eu; \
     yes | sdkmanager --licenses >/dev/null; \
     sdkmanager "platform-tools" "platforms;android-${ANDROID_PLATFORM}" "build-tools;${ANDROID_BUILD_TOOLS}" "ndk;${ANDROID_NDK}" >/dev/null; \
     mkdir -p "${GRADLE_USER_HOME}"; \
-    chmod -R a+rwX "${ANDROID_HOME}" "${GRADLE_USER_HOME}" /sdks/flutter 2>/dev/null || true
+    chmod -R a+rwX "${ANDROID_HOME}" "${GRADLE_USER_HOME}"
 
 # cargokit builds the native library with the stable toolchain for the four Android ABIs.
-RUN rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android \
-    && chmod -R a+rwX "${RUSTUP_HOME}"
+# No chmod -R on RUSTUP_HOME or the Flutter SDK here: changing the mode of an existing tree copies all of it into a new layer
+# (it doubled the size of this image), and CI jobs run as root.
+RUN rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android
 
 RUN flutter config --android-sdk "${ANDROID_HOME}" >/dev/null \
     && (yes | flutter doctor --android-licenses >/dev/null 2>&1 || true)
