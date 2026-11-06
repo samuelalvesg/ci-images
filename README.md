@@ -10,6 +10,8 @@ e como `FROM` de qualquer Dockerfile (Coolify, Docker, Podman).
 |---|---|---|
 | `ghcr.io/samuelalvesg/flutter` | Ubuntu 24.04, Flutter SDK oficial (web habilitado), `clang`, `cmake`, `ninja` | `3.47.5`, `3.47`, `latest` |
 | `ghcr.io/samuelalvesg/flutter-rust` | a imagem `flutter` + Rust (stable e nightly fixa com `wasm32` e `rust-src`), `flutter_rust_bridge_codegen`, `wasm-pack`, `wasm-opt`, `protoc` + `protoc-gen-dart` | `3.47.5`, `3.47`, `latest` (mesma versão do Flutter) |
+| `ghcr.io/samuelalvesg/flutter-linux` | a imagem `flutter-rust` + toolchain do Flutter para Linux desktop: GTK3, gstreamer, libsecret, appindicator | `3.47.5`, `3.47`, `latest` (mesma versão do Flutter) |
+| `ghcr.io/samuelalvesg/flutter-android` | a imagem `flutter-rust` + JDK 17, Android SDK (plataforma 36, build-tools 36.0.0, NDK 28.2.13676358) e os 4 alvos Rust do Android | `3.47.5`, `3.47`, `latest` (mesma versão do Flutter) |
 | `ghcr.io/samuelalvesg/rust` | Ubuntu 24.04, Rust (stable e nightly fixa com `wasm32`), `clippy`, `rustfmt`, `flutter_rust_bridge_codegen`, `wasm-pack` | `1.0.0`, `1.0`, `latest` |
 | `ghcr.io/samuelalvesg/dotnet` | SDK .NET 10, `dotnet-ef`, `python3`, `jq` | `10.0.0`, `10.0`, `latest` |
 
@@ -17,7 +19,19 @@ e como `FROM` de qualquer Dockerfile (Coolify, Docker, Podman).
 `X.Y-sha-<commit>` identifica o commit de origem. Para build reproduzível, use o digest:
 `ghcr.io/samuelalvesg/flutter@sha256:...`.
 
-**Arquitetura:** `linux/amd64`. **Não cobertas:** Android, iOS, macOS e Windows (precisam de SDK Android/JDK ou de runner próprio).
+**Arquitetura:** `linux/amd64`.
+
+**Qual imagem para qual plataforma do Flutter**
+
+| Plataforma | Imagem | Observação |
+|---|---|---|
+| Web (JS e WASM) | `flutter-rust` | traz o toolchain Rust/`wasm32` para o `flutter_rust_bridge` |
+| Linux desktop | `flutter-linux` | |
+| Android (APK e AAB) | `flutter-android` | assinatura de release fica por conta do seu workflow (keystore como secret) |
+| Windows | nenhuma | precisa do MSVC: use um runner `windows-*` |
+| macOS e iOS | nenhuma | precisam do Xcode: use um runner `macos-*`; imagens Docker de macOS não são distribuídas |
+
+Windows, macOS e iOS não rodam em contêiner Linux, por isso não existem imagens para eles.
 
 Cada imagem traz labels OCI (`org.opencontainers.image.*`) com versão, licença e origem, mais `dev.flutter.version`,
 `dev.rust.stable`, `dev.rust.nightly` e `dev.frb.version`, e vem com SBOM e proveniência assinada.
