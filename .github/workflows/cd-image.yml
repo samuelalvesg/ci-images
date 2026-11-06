@@ -41,11 +41,11 @@ on:
       BUILD_ARGS_SECRET:
         description: Newline-separated KEY=VALUE build arguments that are secret
         required: false
-      COOLIFY_URL:
+      COOLIFY_DEPLOY_URL:
+        description: Deploy webhook URL of the Coolify resource (Webhooks tab of the resource); treat it as a secret
         required: false
       COOLIFY_TOKEN:
-        required: false
-      COOLIFY_UUID:
+        description: Coolify API token, sent as a Bearer header when the webhook requires one
         required: false
     outputs:
       image:
@@ -148,15 +148,13 @@ jobs:
       group: deploy-${{ inputs.image_name }}
       cancel-in-progress: false
     steps:
-      - name: Ask Coolify to redeploy
+      - name: Call the Coolify deploy webhook
         env:
-          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          DEPLOY_URL: ${{ secrets.COOLIFY_DEPLOY_URL }}
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
-          COOLIFY_UUID: ${{ secrets.COOLIFY_UUID }}
         run: |
-          for v in COOLIFY_URL COOLIFY_TOKEN COOLIFY_UUID; do
-            if [ -z "${!v}" ]; then echo "::error::secret $v is not set"; exit 1; fi
-          done
-          curl -fsS --retry 3 --max-time 30 \
-            -H "Authorization: Bearer $COOLIFY_TOKEN" \
-            "${COOLIFY_URL%/}/api/v1/deploy?uuid=$COOLIFY_UUID&force=false"
+          if [ -z "$DEPLOY_URL" ]; then echo "::error::secret COOLIFY_DEPLOY_URL is not set"; exit 1; fi
+          echo "::add-mask::$DEPLOY_URL"
+          auth=()
+          if [ -n "$COOLIFY_TOKEN" ]; then auth=(-H "Authorization: Bearer $COOLIFY_TOKEN"); fi
+          curl -fsS --retry 3 --max-time 30 "${auth[@]}" "$DEPLOY_URL"

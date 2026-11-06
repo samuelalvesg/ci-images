@@ -77,14 +77,13 @@ jobs:
       image_name: minha-api
       deploy: true
     secrets:
-      COOLIFY_URL: ${{ secrets.COOLIFY_URL }}      # https://coolify.exemplo.com
-      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}  # token da API do Coolify
-      COOLIFY_UUID: ${{ secrets.COOLIFY_UUID }}    # uuid do recurso
+      COOLIFY_DEPLOY_URL: ${{ secrets.COOLIFY_DEPLOY_URL }}  # webhook de deploy do recurso (aba Webhooks)
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}            # token da API, se o webhook exigir
 ```
 
 Entradas: `image_name`, `ref`, `context`, `dockerfile`, `build_args`, `submodules`, `deploy`, `environment`. Segredos:
 `BUILD_ARGS_SECRET` (build args secretos, uma linha `CHAVE=valor` cada), `SUBMODULE_TOKEN`, `COOLIFY_URL`,
-`COOLIFY_TOKEN`, `COOLIFY_UUID`. O job de deploy usa o *environment* `production`: configure revisores obrigatórios nele
+`COOLIFY_DEPLOY_URL`, `COOLIFY_TOKEN`. O job de deploy usa o *environment* `production`: configure revisores obrigatórios nele
 para exigir aprovação manual. Saídas: `image` e `digest`.
 
 ## Licença
