@@ -59,12 +59,22 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # A standard ubuntu-latest runner has about 14 GB free; the Android image (base + SDK + NDK + build cache) needs more.
-      - name: Free disk space
+      # The large Android image (base + SDK + NDK + Gradle cache + build cache) needs about 30 GB. The ubuntu-24.04 runner has
+      # 145 GB of disk and about 78 GB free (measured), so the preinstalled toolchains are removed only when the free space is
+      # below 40 GB. Removing them unconditionally took 92 s. Only the two largest are removed: the many small files of the
+      # tool cache are what makes the removal slow.
+      - name: Free disk space (only if needed)
         if: inputs.free_disk_space
         run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
           df -h / | tail -1
+          free_gb=$(df --output=avail -BG / | tail -1 | tr -dc '0-9')
+          if [ "$free_gb" -lt 40 ]; then
+            echo "only ${free_gb} GB free: removing the preinstalled Android SDK and .NET"
+            sudo rm -rf /usr/local/lib/android /usr/share/dotnet
+            df -h / | tail -1
+          else
+            echo "${free_gb} GB free: nothing to remove"
+          fi
 
       - name: Resolve image reference and tags
         id: ref
@@ -167,8 +177,10 @@ jobs:
           failure-threshold: error
 
       # Report only for now: base images carry unfixed CVEs that would block every publish.
+      # Only when publishing: the scan only reports (it never fails the run), and on the largest image it took 223 s of every
+      # pull request run. The result of a publication is in the job log of the run on main.
       - name: Scan image for vulnerabilities
-        if: steps.reuse.outputs.skip != 'true'
+        if: inputs.publish && steps.reuse.outputs.skip != 'true'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           image-ref: ${{ steps.ref.outputs.image }}
