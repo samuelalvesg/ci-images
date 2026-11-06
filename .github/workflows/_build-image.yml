@@ -47,7 +47,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
@@ -59,12 +59,22 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # A standard ubuntu-latest runner has about 14 GB free; the Android image (base + SDK + NDK + build cache) needs more.
-      - name: Free disk space
+      # The large Android image (base + SDK + NDK + Gradle cache + build cache) needs about 30 GB. The ubuntu-24.04 runner has
+      # 145 GB of disk and about 78 GB free (measured), so the preinstalled toolchains are removed only when the free space is
+      # below 40 GB. Removing them unconditionally took 92 s. Only the two largest are removed: the many small files of the
+      # tool cache are what makes the removal slow.
+      - name: Free disk space (only if needed)
         if: inputs.free_disk_space
         run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
           df -h / | tail -1
+          free_gb=$(df --output=avail -BG / | tail -1 | tr -dc '0-9')
+          if [ "$free_gb" -lt 40 ]; then
+            echo "only ${free_gb} GB free: removing the preinstalled Android SDK and .NET"
+            sudo rm -rf /usr/local/lib/android /usr/share/dotnet
+            df -h / | tail -1
+          else
+            echo "${free_gb} GB free: nothing to remove"
+          fi
 
       - name: Resolve image reference and tags
         id: ref
@@ -88,30 +98,34 @@ jobs:
       - uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # A push to main does not rebuild an image whose inputs did not change: the published image carries a
-      # `content-<hash>` tag, and if that tag already exists the build, tests and push are skipped. A manual run
-      # always rebuilds (it also picks up base-image updates, which the hash cannot see for ubuntu/dotnet bases).
+      # A push to main or a pull request does not rebuild an image whose inputs did not change: the published image carries
+      # a `content-<hash>` tag, and if that tag already exists the image was already built and tested with exactly these
+      # inputs, so the build, tests and push are skipped. The hash covers the context files, the build args, the version,
+      # the digest of the published base image, the test command and this workflow file itself, so a change to any of them
+      # rebuilds. A manual run always rebuilds (it also picks up base-image updates, which the hash cannot see for the
+      # ubuntu and dotnet bases).
       - name: Content hash and reuse check
         id: reuse
         env:
           CONTEXT: ${{ inputs.context }}
           ARGS: ${{ inputs.build_args }}
+          TEST_COMMAND: ${{ inputs.test_command }}
           VERSION: ${{ inputs.version }}
           BASE: ${{ inputs.base_image_name != '' && format('ghcr.io/{0}/{1}:{2}', steps.ref.outputs.owner, inputs.base_image_name, inputs.version) || '' }}
           REPO: ghcr.io/${{ steps.ref.outputs.owner }}/${{ inputs.name }}
-          CAN_SKIP: ${{ inputs.publish && github.event_name == 'push' }}
+          CAN_SKIP: ${{ github.event_name != 'workflow_dispatch' }}
         run: |
           base_digest=""
           if [ -n "$BASE" ]; then
             base_digest="$(docker buildx imagetools inspect "$BASE" --format '{{.Manifest.Digest}}' 2>/dev/null || true)"
           fi
-          hash="$( { find "$CONTEXT" -type f | LC_ALL=C sort | xargs sha256sum; printf '%s\n' "$ARGS" "$VERSION" "$base_digest"; } | sha256sum | cut -c1-16 )"
+          hash="$( { find "$CONTEXT" -type f | LC_ALL=C sort | xargs sha256sum; sha256sum .github/workflows/_build-image.yml; printf '%s\n' "$ARGS" "$TEST_COMMAND" "$VERSION" "$base_digest"; } | sha256sum | cut -c1-16 )"
           tag="$REPO:content-$hash"
           skip=false
           if [ "$CAN_SKIP" = "true" ] && docker buildx imagetools inspect "$tag" >/dev/null 2>&1; then skip=true; fi
@@ -142,8 +156,11 @@ jobs:
           labels: ${{ steps.labels.outputs.labels }}
           tags: ${{ steps.ref.outputs.image }}
           load: true
-          cache-from: type=gha,scope=${{ inputs.name }}-${{ inputs.version }}
-          cache-to: type=gha,mode=max,scope=${{ inputs.name }}-${{ inputs.version }}
+          # Layer cache lives in the registry (tag `buildcache` of the same package), not in the Actions cache: that one is
+          # limited to 10 GB per repository and the Android image alone is about 11 GB, so it was evicted before being reused.
+          # Pull requests read it too; only runs that can write to the registry (not forks, not Dependabot) update it.
+          cache-from: type=registry,ref=${{ format('ghcr.io/{0}/{1}:buildcache', steps.ref.outputs.owner, inputs.name) }}
+          cache-to: ${{ github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && format('type=registry,ref=ghcr.io/{0}/{1}:buildcache,mode=max,image-manifest=true,oci-mediatypes=true', steps.ref.outputs.owner, inputs.name) || '' }}
 
       - name: Smoke test
         if: steps.reuse.outputs.skip != 'true'
@@ -156,11 +173,14 @@ jobs:
         uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: ${{ inputs.context }}/Dockerfile
+          config: .hadolint.yaml
           failure-threshold: error
 
       # Report only for now: base images carry unfixed CVEs that would block every publish.
+      # Only when publishing: the scan only reports (it never fails the run), and on the largest image it took 223 s of every
+      # pull request run. The result of a publication is in the job log of the run on main.
       - name: Scan image for vulnerabilities
-        if: steps.reuse.outputs.skip != 'true'
+        if: inputs.publish && steps.reuse.outputs.skip != 'true'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           image-ref: ${{ steps.ref.outputs.image }}
@@ -185,7 +205,7 @@ jobs:
           push: true
           provenance: mode=max
           sbom: true
-          cache-from: type=gha,scope=${{ inputs.name }}-${{ inputs.version }}
+          cache-from: type=registry,ref=${{ format('ghcr.io/{0}/{1}:buildcache', steps.ref.outputs.owner, inputs.name) }}
 
       # Signed provenance needs a public repository (or an Enterprise plan); skipped silently otherwise.
       - name: Attest build provenance
@@ -208,7 +228,7 @@ jobs:
   use-as-ci-container:
     needs: build
     if: inputs.publish && needs.build.outputs.skipped != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: ${{ needs.build.outputs.image }}
       credentials:
