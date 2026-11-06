@@ -12,13 +12,13 @@ imagens mantêm as licenças próprias.
 
 | Imagem | Conteúdo | Tags | Pasta |
 |---|---|---|---|
-| `ghcr.io/<dono>/flutter` | Ubuntu 24.04 + Flutter SDK oficial (web habilitado) + `clang/cmake/ninja` | `3.47.5`, `3.47`, `latest`, `3.47-sha-<commit>` | [`flutter-image`](docker/flutter-image) |
-| `ghcr.io/<dono>/flutter-rust` | a imagem `flutter` + Rust stable e nightly fixa com `wasm32` e `rust-src`, `flutter_rust_bridge_codegen`, `wasm-pack` | idem (a versão é a do Flutter) | [`rust-image`](docker/rust-image) |
-| `ghcr.io/<dono>/rust` | Ubuntu 24.04 + Rust stable e nightly fixa com `wasm32`, `clippy`, `rustfmt`, FRB codegen, `wasm-pack` | `1.0.0`, `1.0`, `latest` (revisão da imagem; as versões do Rust estão nos labels) | [`rust-image`](docker/rust-image) |
-| `ghcr.io/<dono>/dotnet` | SDK .NET (padrão 10.0) + `dotnet-ef`, `python3`, `jq` | `10.0.0`, `10.0`, `latest` | [`dotnet-image`](docker/dotnet-image) |
+| `ghcr.io/samuelalvesg/flutter` | Ubuntu 24.04 + Flutter SDK oficial (web habilitado) + `clang/cmake/ninja` | `3.47.5`, `3.47`, `latest`, `3.47-sha-<commit>` | [`flutter-image`](docker/flutter-image) |
+| `ghcr.io/samuelalvesg/flutter-rust` | a imagem `flutter` + Rust stable e nightly fixa com `wasm32` e `rust-src`, `flutter_rust_bridge_codegen`, `wasm-pack` | idem (a versão é a do Flutter) | [`rust-image`](docker/rust-image) |
+| `ghcr.io/samuelalvesg/rust` | Ubuntu 24.04 + Rust stable e nightly fixa com `wasm32`, `clippy`, `rustfmt`, FRB codegen, `wasm-pack` | `1.0.0`, `1.0`, `latest` (revisão da imagem; as versões do Rust estão nos labels) | [`rust-image`](docker/rust-image) |
+| `ghcr.io/samuelalvesg/dotnet` | SDK .NET (padrão 10.0) + `dotnet-ef`, `python3`, `jq` | `10.0.0`, `10.0`, `latest` | [`dotnet-image`](docker/dotnet-image) |
 
 Cada tag fixa (`3.47.5`) nunca é sobrescrita por outra versão; `X.Y` e `latest` andam para a publicação mais nova. Para build
-reproduzível, fixe por digest: `image: ghcr.io/<dono>/flutter@sha256:...` (o digest aparece no resumo do workflow).
+reproduzível, fixe por digest: `image: ghcr.io/samuelalvesg/flutter@sha256:...` (o digest aparece no resumo do workflow).
 
 Labels OCI em todas (`org.opencontainers.image.{title,description,version,source,revision,created,licenses,documentation}`),
 mais `dev.flutter.version`, `dev.rust.stable`, `dev.rust.nightly`, `dev.frb.version`. As imagens publicadas levam
@@ -31,7 +31,7 @@ jobs:
   web:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/<dono>/flutter-rust:3.47.5
+      image: ghcr.io/samuelalvesg/flutter-rust:3.47.5
       credentials: { username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }  # só se o pacote for privado
     steps:
       - uses: actions/checkout@v4
@@ -48,7 +48,7 @@ Testes do backend com Testcontainers precisam do socket do Docker do host:
 ## Usar como base de Dockerfile (Coolify, qualquer lugar)
 
 ```dockerfile
-FROM ghcr.io/<dono>/flutter-rust:3.47.5 AS build-env
+FROM ghcr.io/samuelalvesg/flutter-rust:3.47.5 AS build-env
 ```
 
 O pacote nasce **privado**. Para qualquer pessoa (ou o Coolify) puxar sem login: *Package settings → Change visibility → Public*
@@ -79,7 +79,7 @@ Atualizar uma versão: rodar o workflow com a versão nova; as tags `X.Y.Z` anti
   decisão do mantenedor; aplica-se ao repositório que de fato publicar as imagens):
 
   ```bash
-  gh repo edit <dono>/<repo> \
+  gh repo edit samuelalvesg/ci-images \
     --description "Docker images for CI: Flutter (web/WASM), Rust (wasm32, flutter_rust_bridge) and .NET (dotnet-ef) on ghcr.io" \
     --add-topic docker --add-topic docker-image --add-topic ghcr --add-topic github-actions --add-topic ci \
     --add-topic flutter --add-topic flutter-web --add-topic flutter-rust-bridge --add-topic rust --add-topic webassembly \
