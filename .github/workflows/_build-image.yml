@@ -94,24 +94,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # A push to main does not rebuild an image whose inputs did not change: the published image carries a
-      # `content-<hash>` tag, and if that tag already exists the build, tests and push are skipped. A manual run
-      # always rebuilds (it also picks up base-image updates, which the hash cannot see for ubuntu/dotnet bases).
+      # A push to main or a pull request does not rebuild an image whose inputs did not change: the published image carries
+      # a `content-<hash>` tag, and if that tag already exists the image was already built and tested with exactly these
+      # inputs, so the build, tests and push are skipped. The hash covers the context files, the build args, the version,
+      # the digest of the published base image, the test command and this workflow file itself, so a change to any of them
+      # rebuilds. A manual run always rebuilds (it also picks up base-image updates, which the hash cannot see for the
+      # ubuntu and dotnet bases).
       - name: Content hash and reuse check
         id: reuse
         env:
           CONTEXT: ${{ inputs.context }}
           ARGS: ${{ inputs.build_args }}
+          TEST_COMMAND: ${{ inputs.test_command }}
           VERSION: ${{ inputs.version }}
           BASE: ${{ inputs.base_image_name != '' && format('ghcr.io/{0}/{1}:{2}', steps.ref.outputs.owner, inputs.base_image_name, inputs.version) || '' }}
           REPO: ghcr.io/${{ steps.ref.outputs.owner }}/${{ inputs.name }}
-          CAN_SKIP: ${{ inputs.publish && github.event_name == 'push' }}
+          CAN_SKIP: ${{ github.event_name != 'workflow_dispatch' }}
         run: |
           base_digest=""
           if [ -n "$BASE" ]; then
             base_digest="$(docker buildx imagetools inspect "$BASE" --format '{{.Manifest.Digest}}' 2>/dev/null || true)"
           fi
-          hash="$( { find "$CONTEXT" -type f | LC_ALL=C sort | xargs sha256sum; printf '%s\n' "$ARGS" "$VERSION" "$base_digest"; } | sha256sum | cut -c1-16 )"
+          hash="$( { find "$CONTEXT" -type f | LC_ALL=C sort | xargs sha256sum; sha256sum .github/workflows/_build-image.yml; printf '%s\n' "$ARGS" "$TEST_COMMAND" "$VERSION" "$base_digest"; } | sha256sum | cut -c1-16 )"
           tag="$REPO:content-$hash"
           skip=false
           if [ "$CAN_SKIP" = "true" ] && docker buildx imagetools inspect "$tag" >/dev/null 2>&1; then skip=true; fi

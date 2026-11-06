@@ -19,8 +19,10 @@ Pull requests constroem e testam as imagens, sem publicar. O `flutter-rust` só 
 ## Publicação (mantenedores)
 
 Cada imagem publicada leva também a tag `content-<hash>` (hash dos arquivos do contexto, dos argumentos, da versão e, no
-`flutter-rust`, do digest da base `flutter`). Num push em `main`, se essa tag já existe, o build, os testes e o push dessa imagem são
-pulados; execução manual sempre reconstrói (é o que pega atualizações da imagem base, que o hash não enxerga).
+`flutter-rust`, do digest da base `flutter`). Num push em `main` ou num PR, se essa tag já existe, o build, os testes e o push dessa imagem são
+pulados (ela já foi construída e testada com exatamente essas entradas). O hash também cobre o comando de teste e o próprio
+`_build-image.yml`, então mexer neles reconstrói tudo. Execução manual sempre reconstrói (é o que pega atualizações da imagem
+base, que o hash não enxerga).
 
 Push em `docker/**` na `main`, ou *Actions → CI images → Run workflow* com as versões do Flutter e do .NET. As tags
 `X.Y.Z` anteriores continuam disponíveis. Pacotes novos do GHCR nascem privados: *Package settings → Change visibility → Public*.
