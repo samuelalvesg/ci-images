@@ -1,0 +1,121 @@
+name: CI images
+
+# One workflow publishes the whole CI toolchain: flutter -> flutter-rust (built on top of it), plus rust and dotnet.
+# Pull requests only build and test. Publishing needs a push to main or a manual run.
+on:
+  workflow_dispatch:
+    inputs:
+      flutter_version:
+        description: Flutter stable version
+        required: true
+        default: "3.47.5"
+      dotnet_version:
+        description: ".NET SDK channel (major.minor)"
+        required: true
+        default: "10.0"
+      publish_floating_tags:
+        description: Also move `latest` and `<major>.<minor>`
+        type: boolean
+        default: true
+  push:
+    branches: [main]
+    paths:
+      - "docker/**"
+      - ".github/workflows/flutter-image.yml"
+      - ".github/workflows/_build-image.yml"
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "docker/**"
+      - ".github/workflows/flutter-image.yml"
+      - ".github/workflows/_build-image.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Draft pull requests skip every job below (they all depend on this one), so pushes to a draft cost no CI minutes.
+  versions:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    outputs:
+      flutter: ${{ steps.v.outputs.flutter }}
+      dotnet: ${{ steps.v.outputs.dotnet }}
+      publish: ${{ steps.v.outputs.publish }}
+      floating: ${{ steps.v.outputs.floating }}
+    steps:
+      - id: v
+        env:
+          FLUTTER: ${{ inputs.flutter_version }}
+          DOTNET: ${{ inputs.dotnet_version }}
+          FLOATING: ${{ inputs.publish_floating_tags }}
+        run: |
+          {
+            echo "flutter=${FLUTTER:-3.47.5}"
+            echo "dotnet=${DOTNET:-10.0}"
+            echo "floating=${FLOATING:-true}"
+            if [ "${{ github.event_name }}" = "pull_request" ]; then echo "publish=false"; else echo "publish=true"; fi
+          } >> "$GITHUB_OUTPUT"
+
+  flutter:
+    needs: versions
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    uses: ./.github/workflows/_build-image.yml
+    with:
+      name: flutter
+      version: ${{ needs.versions.outputs.flutter }}
+      context: docker/flutter-image
+      build_args: FLUTTER_VERSION=${{ needs.versions.outputs.flutter }}
+      description: "Flutter SDK (stable, web) on Ubuntu 24.04 - ready-to-use Docker image for GitHub Actions CI and Coolify/Docker builds. Tags: X.Y.Z, X.Y, latest"
+      test_command: docker/flutter-image/test.sh "$IMAGE" "${{ needs.versions.outputs.flutter }}"
+      publish: ${{ needs.versions.outputs.publish == 'true' }}
+      floating_tags: ${{ needs.versions.outputs.floating == 'true' }}
+
+  # Builds FROM the published flutter image, so it only runs when that one was pushed. In pull requests the `rust` job
+  # validates the same Dockerfile.
+  flutter-rust:
+    needs: [versions, flutter]
+    if: needs.versions.outputs.publish == 'true'
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    uses: ./.github/workflows/_build-image.yml
+    with:
+      name: flutter-rust
+      version: ${{ needs.versions.outputs.flutter }}
+      context: docker/rust-image
+      base_image_name: flutter
+      build_args: WITH_APP_TOOLS=true
+      description: "Flutter + Rust (stable, pinned nightly, wasm32), flutter_rust_bridge_codegen, wasm-pack, wasm-opt and protoc - Docker image for Flutter web/WASM CI with native Rust. Tags: X.Y.Z, X.Y, latest"
+      test_command: docker/rust-image/test.sh "$IMAGE" flutter
+      publish: ${{ needs.versions.outputs.publish == 'true' }}
+      floating_tags: ${{ needs.versions.outputs.floating == 'true' }}
+
+  rust:
+    needs: versions
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    uses: ./.github/workflows/_build-image.yml
+    with:
+      name: rust
+      version: "1.0.0"
+      context: docker/rust-image
+      description: "Rust (stable + pinned nightly, wasm32, clippy, rustfmt), flutter_rust_bridge_codegen and wasm-pack preinstalled - Docker image for Rust/WASM CI. Tags: 1.0.0, 1.0, latest"
+      test_command: docker/rust-image/test.sh "$IMAGE"
+      publish: ${{ needs.versions.outputs.publish == 'true' }}
+      floating_tags: ${{ needs.versions.outputs.floating == 'true' }}
+
+  dotnet:
+    needs: versions
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    uses: ./.github/workflows/_build-image.yml
+    with:
+      name: dotnet
+      version: ${{ needs.versions.outputs.dotnet }}.0
+      context: docker/dotnet-image
+      build_args: DOTNET_VERSION=${{ needs.versions.outputs.dotnet }}
+      description: ".NET SDK (10.0) with dotnet-ef, python3 and jq preinstalled - Docker image for ASP.NET/EF Core CI on GitHub Actions. Tags: X.Y.Z, X.Y, latest"
+      test_command: docker/dotnet-image/test.sh "$IMAGE" "${{ needs.versions.outputs.dotnet }}"
+      publish: ${{ needs.versions.outputs.publish == 'true' }}
+      floating_tags: ${{ needs.versions.outputs.floating == 'true' }}

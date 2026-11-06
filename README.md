@@ -1,28 +1,26 @@
 # Imagens de CI (Flutter, Rust, .NET)
 
-> Docker images for CI: **Flutter** (web/WASM), **Rust** (wasm32, flutter_rust_bridge, wasm-pack) and **.NET** (dotnet-ef).
-> Ready-made toolchains for GitHub Actions `container:` jobs, Coolify and any Dockerfile `FROM`. Published on `ghcr.io`.
-> Keywords: flutter docker image, flutter web ci, flutter wasm, flutter_rust_bridge, rust wasm32, dotnet sdk ci, github actions container, ghcr.
+Imagens Docker prontas para CI e builds: o toolchain já vem instalado, sem baixar o Flutter SDK, compilar
+`flutter_rust_bridge_codegen` ou instalar `dotnet-ef` a cada execução. Servem como `container:` de jobs do GitHub Actions
+e como `FROM` de qualquer Dockerfile (Coolify, Docker, Podman).
 
-Imagens prontas para acelerar CI e builds: o toolchain já vem instalado, em vez de ser baixado e compilado a cada execução
-(`cargo install flutter_rust_bridge_codegen`, `dotnet tool install dotnet-ef`, SDK do Flutter...). Publicadas no GitHub
-Container Registry por [`flutter-image.yml`](.github/workflows/flutter-image.yml). Licença Apache-2.0
-(ver `LICENSE` em cada pasta); o Flutter SDK (BSD-3), o .NET SDK (MIT), Rust (MIT/Apache-2.0) e os pacotes Ubuntu dentro das
-imagens mantêm as licenças próprias.
+## Imagens
 
-| Imagem | Conteúdo | Tags | Pasta |
-|---|---|---|---|
-| `ghcr.io/<dono>/flutter` | Ubuntu 24.04 + Flutter SDK oficial (web habilitado) + `clang/cmake/ninja` | `3.47.5`, `3.47`, `latest`, `3.47-sha-<commit>` | [`flutter-image`](docker/flutter-image) |
-| `ghcr.io/<dono>/flutter-rust` | a imagem `flutter` + Rust stable e nightly fixa com `wasm32` e `rust-src`, `flutter_rust_bridge_codegen`, `wasm-pack` | idem (a versão é a do Flutter) | [`rust-image`](docker/rust-image) |
-| `ghcr.io/<dono>/rust` | Ubuntu 24.04 + Rust stable e nightly fixa com `wasm32`, `clippy`, `rustfmt`, FRB codegen, `wasm-pack` | `1.0.0`, `1.0`, `latest` (revisão da imagem; as versões do Rust estão nos labels) | [`rust-image`](docker/rust-image) |
-| `ghcr.io/<dono>/dotnet` | SDK .NET (padrão 10.0) + `dotnet-ef`, `python3`, `jq` | `10.0.0`, `10.0`, `latest` | [`dotnet-image`](docker/dotnet-image) |
+| Imagem | O que traz | Tags |
+|---|---|---|
+| `ghcr.io/samuelalvesg/flutter` | Ubuntu 24.04, Flutter SDK oficial (web habilitado), `clang`, `cmake`, `ninja` | `3.47.5`, `3.47`, `latest` |
+| `ghcr.io/samuelalvesg/flutter-rust` | a imagem `flutter` + Rust (stable e nightly fixa com `wasm32` e `rust-src`), `flutter_rust_bridge_codegen`, `wasm-pack`, `wasm-opt`, `protoc` + `protoc-gen-dart` | `3.47.5`, `3.47`, `latest` (mesma versão do Flutter) |
+| `ghcr.io/samuelalvesg/rust` | Ubuntu 24.04, Rust (stable e nightly fixa com `wasm32`), `clippy`, `rustfmt`, `flutter_rust_bridge_codegen`, `wasm-pack` | `1.0.0`, `1.0`, `latest` |
+| `ghcr.io/samuelalvesg/dotnet` | SDK .NET 10, `dotnet-ef`, `python3`, `jq` | `10.0.0`, `10.0`, `latest` |
 
-Cada tag fixa (`3.47.5`) nunca é sobrescrita por outra versão; `X.Y` e `latest` andam para a publicação mais nova. Para build
-reproduzível, fixe por digest: `image: ghcr.io/<dono>/flutter@sha256:...` (o digest aparece no resumo do workflow).
+**Tags:** `X.Y.Z` é fixa (não muda de conteúdo para outra versão); `X.Y` e `latest` seguem a publicação mais nova;
+`X.Y-sha-<commit>` identifica o commit de origem. Para build reproduzível, use o digest:
+`ghcr.io/samuelalvesg/flutter@sha256:...`.
 
-Labels OCI em todas (`org.opencontainers.image.{title,description,version,source,revision,created,licenses,documentation}`),
-mais `dev.flutter.version`, `dev.rust.stable`, `dev.rust.nightly`, `dev.frb.version`. As imagens publicadas levam
-**SBOM e proveniência** (attestations do buildx); a atestação assinada só é emitida quando o repositório é público.
+**Arquitetura:** `linux/amd64`. **Não cobertas:** Android, iOS, macOS e Windows (precisam de SDK Android/JDK ou de runner próprio).
+
+Cada imagem traz labels OCI (`org.opencontainers.image.*`) com versão, licença e origem, mais `dev.flutter.version`,
+`dev.rust.stable`, `dev.rust.nightly` e `dev.frb.version`, e vem com SBOM e proveniência assinada.
 
 ## Usar no GitHub Actions
 
@@ -31,66 +29,64 @@ jobs:
   web:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/<dono>/flutter-rust:3.47.5
-      credentials: { username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }  # só se o pacote for privado
+      image: ghcr.io/samuelalvesg/flutter-rust:3.47.5
     steps:
       - uses: actions/checkout@v4
       - run: flutter pub get && flutter analyze && flutter test
 ```
 
-O runner troca o `HOME` e faz o checkout com outro dono; as imagens guardam tudo em caminhos de sistema
-(`/usr/local/cargo`, `/sdks/flutter`...) e confiam em qualquer diretório no git, por isso funcionam como `container:`.
-Testes do backend com Testcontainers precisam do socket do Docker do host:
-`container.options: -v /var/run/docker.sock:/var/run/docker.sock`.
+As imagens funcionam como `container:` mesmo com o `HOME` trocado pelo runner e o checkout feito por outro usuário: nada
+depende de `/root` e o git confia em qualquer diretório. Se o pacote for privado, acrescente
+`credentials: { username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }`.
 
-**Não cobertos:** Android, iOS, macOS e Windows (precisam de SDK Android/JDK ou de runner próprio). As imagens são `linux/amd64`.
+Testes .NET com Testcontainers precisam do socket do Docker do host:
 
-## Usar como base de Dockerfile (Coolify, qualquer lugar)
+```yaml
+    container:
+      image: ghcr.io/samuelalvesg/dotnet:10.0
+      options: -v /var/run/docker.sock:/var/run/docker.sock
+```
+
+## Usar como base de Dockerfile
 
 ```dockerfile
-FROM ghcr.io/<dono>/flutter-rust:3.47.5 AS build-env
+FROM ghcr.io/samuelalvesg/flutter-rust:3.47.5 AS build-env
+WORKDIR /app
+COPY . .
+RUN flutter build web --release --wasm
 ```
 
-O pacote nasce **privado**. Para qualquer pessoa (ou o Coolify) puxar sem login: *Package settings → Change visibility → Public*
-(o `GITHUB_TOKEN` do workflow não consegue mudar isso).
+## Variáveis e caminhos
 
-## Construir localmente
+- **flutter / flutter-rust:** `FLUTTER_ROOT=/sdks/flutter`, `PUB_CACHE=/root/.pub-cache`, `CI=true`.
+- **rust / flutter-rust:** `RUSTUP_HOME=/usr/local/rustup`, `CARGO_HOME=/usr/local/cargo`. A nightly fixa é
+  `nightly-2026-06-01` (use `cargo +nightly-2026-06-01 ...` ou `rustup run`).
+- **dotnet:** `NUGET_PACKAGES=/usr/local/nuget/packages`, `DOTNET_CLI_HOME=/usr/local/dotnet-home`; `dotnet-ef` no `PATH`.
 
-```bash
-docker build -t flutter:3.47.5 --build-arg FLUTTER_VERSION=3.47.5 docker/flutter-image && docker/flutter-image/test.sh flutter:3.47.5 3.47.5
-docker build -t flutter-rust:3.47.5 --build-arg BASE=flutter:3.47.5 docker/rust-image && docker/rust-image/test.sh flutter-rust:3.47.5 flutter
-docker build -t dotnet:10.0 --build-arg DOTNET_VERSION=10.0 docker/dotnet-image && docker/dotnet-image/test.sh dotnet:10.0 10
+## Entrega contínua (workflow reutilizável)
+
+`.github/workflows/cd-image.yml` constrói a imagem de uma aplicação, publica em `ghcr.io/<dono>/<imagem>` (tags `main` e
+`sha-<commit>`) e, se pedido, chama a API de deploy do Coolify. Chame-o de qualquer repositório:
+
+```yaml
+jobs:
+  cd:
+    uses: samuelalvesg/ci-images/.github/workflows/cd-image.yml@main
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    with:
+      image_name: minha-api
+      deploy: true
+    secrets:
+      COOLIFY_DEPLOY_URL: ${{ secrets.COOLIFY_DEPLOY_URL }}  # webhook de deploy do recurso (aba Webhooks)
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}            # token da API, se o webhook exigir
 ```
 
-Build args: `FLUTTER_VERSION` (qualquer versão do canal `stable`; o SHA-256 do tarball é conferido contra o manifesto do Google),
-`RUST_STABLE`, `RUST_NIGHTLY`, `FRB_VERSION`, `WASM_PACK_VERSION`, `DOTNET_VERSION`, `DOTNET_EF_VERSION`.
+Entradas: `image_name`, `ref`, `context`, `dockerfile`, `build_args`, `submodules`, `deploy`, `environment`. Segredos:
+`BUILD_ARGS_SECRET` (build args secretos, uma linha `CHAVE=valor` cada), `SUBMODULE_TOKEN`, `COOLIFY_URL`,
+`COOLIFY_DEPLOY_URL`, `COOLIFY_TOKEN`. O job de deploy usa o *environment* `production`: configure revisores obrigatórios nele
+para exigir aprovação manual. Saídas: `image` e `digest`.
 
-## Publicar
+## Licença
 
-Disparo manual (*Actions → CI images → Run workflow*, com a versão do Flutter e do .NET) ou push em `docker/**` na `main`.
-Pull requests só constroem e testam (o `flutter-rust` só roda ao publicar, pois constrói sobre a `flutter` publicada).
-Atualizar uma versão: rodar o workflow com a versão nova; as tags `X.Y.Z` antigas continuam disponíveis.
-
-## Como as imagens são achadas no GitHub
-
-- **Página do pacote (ghcr.io):** título, descrição, versão, licença e link de origem vêm dos labels OCI que o workflow grava
-  (a descrição de cada imagem cita o que ela contém e as tags). O README do pacote é o do repositório ligado pelo label `source`.
-- **Busca por repositório:** o repositório que publica precisa de descrição e *topics*. Comando (efeito externo, rodar com
-  decisão do mantenedor; aplica-se ao repositório que de fato publicar as imagens):
-
-  ```bash
-  gh repo edit <dono>/<repo> \
-    --description "Docker images for CI: Flutter (web/WASM), Rust (wasm32, flutter_rust_bridge) and .NET (dotnet-ef) on ghcr.io" \
-    --add-topic docker --add-topic docker-image --add-topic ghcr --add-topic github-actions --add-topic ci \
-    --add-topic flutter --add-topic flutter-web --add-topic flutter-rust-bridge --add-topic rust --add-topic webassembly \
-    --add-topic dotnet --add-topic dotnet-ef --add-topic coolify
-  ```
-
-  O GitHub aceita até 20 topics, em minúsculas e com hífen.
-- **Visibilidade:** pacote e repositório precisam ser públicos para aparecer em buscas e para qualquer pessoa puxar sem login.
-
-## Visibilidade
-
-Este repositório é público, então os pacotes publicados por ele podem ser públicos e têm atestação assinada de proveniência.
-Pacotes novos do GHCR nascem privados: *Package settings → Change visibility → Public* (o `GITHUB_TOKEN` do workflow não
-consegue mudar isso).
+Apache-2.0 para os Dockerfiles e scripts deste repositório (ver [`LICENSE`](LICENSE)). O Flutter SDK (BSD-3), o .NET SDK (MIT),
+o Rust (MIT/Apache-2.0) e os pacotes Ubuntu dentro das imagens mantêm as licenças próprias.
