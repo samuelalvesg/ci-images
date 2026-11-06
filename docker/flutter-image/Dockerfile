@@ -5,7 +5,7 @@
 #   - Coolify: `FROM` base of the app Dockerfile, pulled from ghcr.io (the package must be public to pull without login).
 # Licensed under Apache-2.0 (see LICENSE). The Flutter SDK, Dart and the Ubuntu packages inside the image
 # keep their own licenses; this license covers only the files in this directory.
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 ARG FLUTTER_VERSION=3.47.5
 ARG FLUTTER_CHANNEL=stable
