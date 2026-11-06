@@ -79,8 +79,9 @@ RUN flutter build web --release --wasm
 
 ## Entrega contínua (workflow reutilizável)
 
-`.github/workflows/cd-image.yml` constrói a imagem de uma aplicação, publica em `ghcr.io/<dono>/<imagem>` (tags `main` e
-`sha-<commit>`) e, se pedido, chama a API de deploy do Coolify. Chame-o de qualquer repositório:
+`.github/workflows/cd-image.yml` constrói a imagem de uma aplicação, publica em `ghcr.io/<dono>/<imagem>` (tag `sha-<commit>` sempre; numa
+tag de versão do Git, também `<tag>` e `latest`) e, se pedido, chama a API de deploy do Coolify. Chame-o de qualquer repositório,
+de preferência com um gatilho intencional (`push: tags: ["v*"]` e `workflow_dispatch`), nunca a cada push em `main`:
 
 ```yaml
 jobs:

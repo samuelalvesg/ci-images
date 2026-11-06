@@ -83,13 +83,19 @@ jobs:
         env:
           NAME: ${{ inputs.image_name }}
           OWNER: ${{ github.repository_owner }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           owner="$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')"
           sha="$(git rev-parse --short=7 HEAD)"
           image="ghcr.io/$owner/$NAME"
+          # Every build is reachable by its commit (sha-<commit>). Only a version tag also gets its own version tag and moves
+          # `latest`: a manual run from a branch never changes what `latest` means.
+          tags="$image:sha-$sha"
+          if [ "$REF_TYPE" = "tag" ]; then tags="$tags"$'\n'"$image:$REF_NAME"$'\n'"$image:latest"; fi
           {
             echo "image=$image:sha-$sha"
-            echo "tags<<EOF"; echo "$image:sha-$sha"; echo "$image:main"; echo "EOF"
+            echo "tags<<EOF"; echo "$tags"; echo "EOF"
             echo "repo=$image"
           } >> "$GITHUB_OUTPUT"
 
