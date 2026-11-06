@@ -10,6 +10,11 @@ ARG ANDROID_CMDLINE_TOOLS=11076708
 ARG ANDROID_PLATFORM=36
 ARG ANDROID_BUILD_TOOLS=36.0.0
 ARG ANDROID_NDK=28.2.13676358
+# Versions the app builds with (apps/symmetris/android): they decide which Gradle distribution and plugins are baked below.
+ARG GRADLE_VERSION=8.14
+ARG AGP_VERSION=8.11.1
+ARG KOTLIN_VERSION=2.2.20
+ARG PREWARM_GRADLE=true
 
 ENV DEBIAN_FRONTEND=noninteractive \
     JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 \
@@ -44,6 +49,24 @@ RUN rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux
 
 RUN flutter config --android-sdk "${ANDROID_HOME}" >/dev/null \
     && (yes | flutter doctor --android-licenses >/dev/null 2>&1 || true)
+
+# Bakes the Gradle distribution, the Android Gradle Plugin, the Kotlin plugin and the Flutter engine artifacts for the
+# versions above into GRADLE_USER_HOME and the Flutter cache, so a CI build does not download them (that download is most
+# of the time of a cold Gradle build). It uses the app's versions on purpose: the Flutter 3.47.5 template uses Gradle 9.3.1,
+# AGP 9.1.0 and Kotlin 2.4.0, which would not help an app on other versions. Set PREWARM_GRADLE=false to skip it.
+RUN set -eu; [ "$PREWARM_GRADLE" = "true" ] || exit 0; \
+    cd /tmp && flutter create --platforms=android -e warm >/dev/null; \
+    cd /tmp/warm/android; \
+    sed -i "s#gradle-[0-9.]*-all.zip#gradle-${GRADLE_VERSION}-all.zip#" gradle/wrapper/gradle-wrapper.properties; \
+    sed -i -E 's/(com\.android\.application"\) version ")[0-9.]+/\1'"${AGP_VERSION}"'/; s/(org\.jetbrains\.kotlin\.android"\) version ")[0-9.]+/\1'"${KOTLIN_VERSION}"'/' settings.gradle.kts; \
+    grep -q "application\") version \"${AGP_VERSION}\"" settings.gradle.kts; \
+    grep -q "kotlin.android\") version \"${KOTLIN_VERSION}\"" settings.gradle.kts; \
+    sed -i -E 's#-Xmx8G#-Xmx4G#; s#MaxMetaspaceSize=4G#MaxMetaspaceSize=1G#' gradle.properties; \
+    cd /tmp/warm; \
+    flutter build apk --release --target-platform=android-arm64 >/dev/null; \
+    flutter build apk --debug --target-platform=android-arm64 >/dev/null; \
+    (cd android && ./gradlew --stop >/dev/null 2>&1 || true); \
+    cd /; rm -rf /tmp/warm
 
 LABEL org.opencontainers.image.licenses="Apache-2.0" \
       dev.android.platform="${ANDROID_PLATFORM}" \
