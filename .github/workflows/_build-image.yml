@@ -148,7 +148,7 @@ jobs:
       # Signed provenance needs a public repository (or an Enterprise plan); skipped silently otherwise.
       - name: Attest build provenance
         if: inputs.publish && github.event.repository.private == false
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ghcr.io/${{ steps.ref.outputs.owner }}/${{ inputs.name }}
           subject-digest: ${{ steps.push.outputs.digest }}
