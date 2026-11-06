@@ -1,0 +1,67 @@
+name: Reuse the pull request result (reusable)
+
+# A push to the default branch re-runs the CI that the merged pull request already ran. When the tree of the pushed commit is
+# identical to the tree of the pull request's last commit, and the CI of that commit succeeded, the same files were already
+# tested and the run can be skipped. Any doubt (no pull request, different tree, no green run, API error) means "do not reuse":
+# the caller's tests then run as usual.
+on:
+  workflow_call:
+    inputs:
+      workflow_file:
+        description: File name of the CI workflow whose pull request run is reused
+        type: string
+        default: ci.yml
+      branch:
+        description: Branch whose pushes may reuse a pull request result
+        type: string
+        default: main
+    outputs:
+      reuse:
+        description: "'true' when the pushed commit was already tested by its pull request"
+        value: ${{ jobs.check.outputs.reuse }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    outputs:
+      reuse: ${{ steps.check.outputs.reuse }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          WORKFLOW_FILE: ${{ inputs.workflow_file }}
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          set +e
+          reuse=false; why="not a push to $BRANCH"
+          if [ "$EVENT" = "push" ] && [ "$REF" = "refs/heads/$BRANCH" ]; then
+            why="no pull request associated with the commit"
+            pr=$(gh api "repos/$REPO/commits/$SHA/pulls" -q '.[0].number // empty' 2>/dev/null)
+            if [ -n "$pr" ]; then
+              head=$(gh api "repos/$REPO/pulls/$pr" -q .head.sha 2>/dev/null)
+              tree_main=$(gh api "repos/$REPO/commits/$SHA" -q .commit.tree.sha 2>/dev/null)
+              tree_pr=$(gh api "repos/$REPO/commits/$head" -q .commit.tree.sha 2>/dev/null)
+              green=$(gh api "repos/$REPO/actions/workflows/$WORKFLOW_FILE/runs?head_sha=$head&event=pull_request&status=completed" \
+                -q '[.workflow_runs[] | select(.conclusion=="success")] | length' 2>/dev/null)
+              if [ -z "$head" ] || [ -z "$tree_main" ] || [ -z "$tree_pr" ]; then
+                why="could not read the commits of pull request #$pr"
+              elif [ "$tree_main" != "$tree_pr" ]; then
+                why="tree differs from the last commit of pull request #$pr (the branch moved after it was tested)"
+              elif [ "${green:-0}" -lt 1 ]; then
+                why="no successful $WORKFLOW_FILE run for the last commit of pull request #$pr"
+              else
+                reuse=true; why="same tree as pull request #$pr (${head:0:7}), whose $WORKFLOW_FILE run succeeded"
+              fi
+            fi
+          fi
+          echo "reuse=$reuse" >> "$GITHUB_OUTPUT"
+          echo "reuse the pull request result: $reuse - $why" | tee -a "$GITHUB_STEP_SUMMARY"
