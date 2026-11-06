@@ -1,0 +1,162 @@
+name: CD image (reusable)
+
+# Builds an application image, pushes it to GHCR and (optionally) asks Coolify to redeploy it.
+# Called from the application repositories; see README.md ("Entrega contínua").
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        description: Image name under ghcr.io/<owner>/ (for example symmetris-backend)
+        required: true
+        type: string
+      ref:
+        description: Commit to build (default - the commit that triggered the caller)
+        type: string
+        default: ""
+      context:
+        type: string
+        default: .
+      dockerfile:
+        type: string
+        default: Dockerfile
+      build_args:
+        description: Newline-separated KEY=VALUE build arguments (not secret)
+        type: string
+        default: ""
+      submodules:
+        description: Initialise git submodules (needs the SUBMODULE_TOKEN secret for private ones)
+        type: boolean
+        default: false
+      deploy:
+        description: Call the Coolify deploy API after the push
+        type: boolean
+        default: true
+      environment:
+        description: GitHub environment of the deploy job (add required reviewers there for a manual approval)
+        type: string
+        default: production
+    secrets:
+      SUBMODULE_TOKEN:
+        required: false
+      BUILD_ARGS_SECRET:
+        description: Newline-separated KEY=VALUE build arguments that are secret
+        required: false
+      COOLIFY_URL:
+        required: false
+      COOLIFY_TOKEN:
+        required: false
+      COOLIFY_UUID:
+        required: false
+    outputs:
+      image:
+        value: ${{ jobs.image.outputs.image }}
+      digest:
+        value: ${{ jobs.image.outputs.digest }}
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    outputs:
+      image: ${{ steps.ref.outputs.image }}
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Checkout submodules
+        if: inputs.submodules
+        env:
+          TOKEN: ${{ secrets.SUBMODULE_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then echo "::error::SUBMODULE_TOKEN is required when submodules is true"; exit 1; fi
+          git -c url."https://x-access-token:${TOKEN}@github.com/".insteadOf="https://github.com/" \
+            submodule update --init --depth 1
+
+      - name: Resolve image reference
+        id: ref
+        env:
+          NAME: ${{ inputs.image_name }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          owner="$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')"
+          sha="$(git rev-parse --short=7 HEAD)"
+          image="ghcr.io/$owner/$NAME"
+          {
+            echo "image=$image:sha-$sha"
+            echo "tags<<EOF"; echo "$image:sha-$sha"; echo "$image:main"; echo "EOF"
+            echo "repo=$image"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: OCI labels
+        id: labels
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.ref.outputs.repo }}
+
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.context }}/${{ inputs.dockerfile }}
+          build-args: |
+            ${{ inputs.build_args }}
+            ${{ secrets.BUILD_ARGS_SECRET }}
+          labels: ${{ steps.labels.outputs.labels }}
+          tags: ${{ steps.ref.outputs.tags }}
+          push: true
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=${{ inputs.image_name }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.image_name }}
+
+      - name: Attest build provenance
+        if: github.event.repository.private == false
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ steps.ref.outputs.repo }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Summary
+        env:
+          TAGS: ${{ steps.ref.outputs.tags }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          { echo "### Published"; echo '```'; echo "$TAGS"; echo '```'; echo "Digest: \`$DIGEST\`"; } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: image
+    if: inputs.deploy
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    concurrency:
+      group: deploy-${{ inputs.image_name }}
+      cancel-in-progress: false
+    steps:
+      - name: Ask Coolify to redeploy
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_UUID: ${{ secrets.COOLIFY_UUID }}
+        run: |
+          for v in COOLIFY_URL COOLIFY_TOKEN COOLIFY_UUID; do
+            if [ -z "${!v}" ]; then echo "::error::secret $v is not set"; exit 1; fi
+          done
+          curl -fsS --retry 3 --max-time 30 \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "${COOLIFY_URL%/}/api/v1/deploy?uuid=$COOLIFY_UUID&force=false"

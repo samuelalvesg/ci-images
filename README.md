@@ -63,6 +63,30 @@ RUN flutter build web --release --wasm
   `nightly-2026-06-01` (use `cargo +nightly-2026-06-01 ...` ou `rustup run`).
 - **dotnet:** `NUGET_PACKAGES=/usr/local/nuget/packages`, `DOTNET_CLI_HOME=/usr/local/dotnet-home`; `dotnet-ef` no `PATH`.
 
+## Entrega contínua (workflow reutilizável)
+
+`.github/workflows/cd-image.yml` constrói a imagem de uma aplicação, publica em `ghcr.io/<dono>/<imagem>` (tags `main` e
+`sha-<commit>`) e, se pedido, chama a API de deploy do Coolify. Chame-o de qualquer repositório:
+
+```yaml
+jobs:
+  cd:
+    uses: samuelalvesg/ci-images/.github/workflows/cd-image.yml@main
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
+    with:
+      image_name: minha-api
+      deploy: true
+    secrets:
+      COOLIFY_URL: ${{ secrets.COOLIFY_URL }}      # https://coolify.exemplo.com
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}  # token da API do Coolify
+      COOLIFY_UUID: ${{ secrets.COOLIFY_UUID }}    # uuid do recurso
+```
+
+Entradas: `image_name`, `ref`, `context`, `dockerfile`, `build_args`, `submodules`, `deploy`, `environment`. Segredos:
+`BUILD_ARGS_SECRET` (build args secretos, uma linha `CHAVE=valor` cada), `SUBMODULE_TOKEN`, `COOLIFY_URL`,
+`COOLIFY_TOKEN`, `COOLIFY_UUID`. O job de deploy usa o *environment* `production`: configure revisores obrigatórios nele
+para exigir aprovação manual. Saídas: `image` e `digest`.
+
 ## Licença
 
 Apache-2.0 para os Dockerfiles e scripts deste repositório (ver [`LICENSE`](LICENSE)). O Flutter SDK (BSD-3), o .NET SDK (MIT),
