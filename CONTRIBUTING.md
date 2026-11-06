@@ -4,7 +4,7 @@
 
 ```bash
 docker build -t flutter:3.47.5 --build-arg FLUTTER_VERSION=3.47.5 docker/flutter-image && docker/flutter-image/test.sh flutter:3.47.5 3.47.5
-docker build -t flutter-rust:3.47.5 --build-arg BASE=flutter:3.47.5 docker/rust-image && docker/rust-image/test.sh flutter-rust:3.47.5 flutter
+docker build -t flutter-rust:3.47.5 --build-arg BASE=flutter:3.47.5 --build-arg WITH_APP_TOOLS=true docker/rust-image && docker/rust-image/test.sh flutter-rust:3.47.5 flutter
 docker build -t dotnet:10.0 --build-arg DOTNET_VERSION=10.0 docker/dotnet-image && docker/dotnet-image/test.sh dotnet:10.0 10
 ```
 

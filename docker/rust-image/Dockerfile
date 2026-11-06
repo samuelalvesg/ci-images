@@ -11,6 +11,9 @@ ARG RUST_STABLE=stable
 ARG RUST_NIGHTLY=nightly-2026-06-01
 ARG FRB_VERSION=2.12.0
 ARG WASM_PACK_VERSION=0.14.0
+# Extra tools for building a Flutter app (flutter-rust image): wasm-opt and protoc + protoc_plugin.
+ARG WITH_APP_TOOLS=false
+ARG PROTOC_PLUGIN_VERSION=21.1.2
 
 # System-wide locations: GitHub Actions swaps HOME, so nothing may live under /root or $HOME.
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -32,6 +35,15 @@ RUN set -eu; \
     cargo binstall -y "flutter_rust_bridge_codegen@$FRB_VERSION" "wasm-pack@$WASM_PACK_VERSION"; \
     chmod -R a+rwX "$RUSTUP_HOME" "$CARGO_HOME"; \
     rustc --version; rustc +"$RUST_NIGHTLY" --version; flutter_rust_bridge_codegen --version; wasm-pack --version
+
+# wasm-opt (binaryen) is used by wasm-pack, which otherwise downloads it on every run.
+# protoc_plugin is pinned to the line that matches protobuf ^3.1.0 used by the app's gRPC client.
+RUN set -eu; [ "$WITH_APP_TOOLS" = "true" ] || exit 0; \
+    apt-get update && apt-get install -y --no-install-recommends binaryen protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*; \
+    dart pub global activate protoc_plugin "${PROTOC_PLUGIN_VERSION}"; \
+    chmod -R a+rwX "$PUB_CACHE"; \
+    protoc --version; wasm-opt --version; command -v protoc-gen-dart
 
 LABEL org.opencontainers.image.licenses="Apache-2.0" \
       dev.rust.stable="${RUST_STABLE}" \

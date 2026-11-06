@@ -9,7 +9,7 @@ e como `FROM` de qualquer Dockerfile (Coolify, Docker, Podman).
 | Imagem | O que traz | Tags |
 |---|---|---|
 | `ghcr.io/samuelalvesg/flutter` | Ubuntu 24.04, Flutter SDK oficial (web habilitado), `clang`, `cmake`, `ninja` | `3.47.5`, `3.47`, `latest` |
-| `ghcr.io/samuelalvesg/flutter-rust` | a imagem `flutter` + Rust (stable e nightly fixa com `wasm32` e `rust-src`), `flutter_rust_bridge_codegen`, `wasm-pack` | `3.47.5`, `3.47`, `latest` (mesma versão do Flutter) |
+| `ghcr.io/samuelalvesg/flutter-rust` | a imagem `flutter` + Rust (stable e nightly fixa com `wasm32` e `rust-src`), `flutter_rust_bridge_codegen`, `wasm-pack`, `wasm-opt`, `protoc` + `protoc-gen-dart` | `3.47.5`, `3.47`, `latest` (mesma versão do Flutter) |
 | `ghcr.io/samuelalvesg/rust` | Ubuntu 24.04, Rust (stable e nightly fixa com `wasm32`), `clippy`, `rustfmt`, `flutter_rust_bridge_codegen`, `wasm-pack` | `1.0.0`, `1.0`, `latest` |
 | `ghcr.io/samuelalvesg/dotnet` | SDK .NET 10, `dotnet-ef`, `python3`, `jq` | `10.0.0`, `10.0`, `latest` |
 

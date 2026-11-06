@@ -113,6 +113,22 @@ jobs:
           IMAGE: ${{ steps.ref.outputs.image }}
         run: ${{ inputs.test_command }}
 
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ${{ inputs.context }}/Dockerfile
+          failure-threshold: error
+
+      # Report only for now: base images carry unfixed CVEs that would block every publish.
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ steps.ref.outputs.image }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"
+          format: table
+
       - name: Push all tags
         id: push
         if: inputs.publish

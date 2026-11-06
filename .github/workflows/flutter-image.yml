@@ -84,7 +84,8 @@ jobs:
       version: ${{ needs.versions.outputs.flutter }}
       context: docker/rust-image
       base_image_name: flutter
-      description: "Flutter + Rust (stable, pinned nightly, wasm32), flutter_rust_bridge_codegen and wasm-pack - Docker image for Flutter web/WASM CI with native Rust. Tags: X.Y.Z, X.Y, latest"
+      build_args: WITH_APP_TOOLS=true
+      description: "Flutter + Rust (stable, pinned nightly, wasm32), flutter_rust_bridge_codegen, wasm-pack, wasm-opt and protoc - Docker image for Flutter web/WASM CI with native Rust. Tags: X.Y.Z, X.Y, latest"
       test_command: docker/rust-image/test.sh "$IMAGE" flutter
       publish: ${{ needs.versions.outputs.publish == 'true' }}
       floating_tags: ${{ needs.versions.outputs.floating == 'true' }}
