@@ -146,8 +146,11 @@ jobs:
           labels: ${{ steps.labels.outputs.labels }}
           tags: ${{ steps.ref.outputs.image }}
           load: true
-          cache-from: type=gha,scope=${{ inputs.name }}-${{ inputs.version }}
-          cache-to: type=gha,mode=max,scope=${{ inputs.name }}-${{ inputs.version }}
+          # Layer cache lives in the registry (tag `buildcache` of the same package), not in the Actions cache: that one is
+          # limited to 10 GB per repository and the Android image alone is about 11 GB, so it was evicted before being reused.
+          # Pull requests read it too; only runs that can write to the registry (not forks, not Dependabot) update it.
+          cache-from: type=registry,ref=${{ format('ghcr.io/{0}/{1}:buildcache', steps.ref.outputs.owner, inputs.name) }}
+          cache-to: ${{ github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && format('type=registry,ref=ghcr.io/{0}/{1}:buildcache,mode=max,image-manifest=true,oci-mediatypes=true', steps.ref.outputs.owner, inputs.name) || '' }}
 
       - name: Smoke test
         if: steps.reuse.outputs.skip != 'true'
@@ -189,7 +192,7 @@ jobs:
           push: true
           provenance: mode=max
           sbom: true
-          cache-from: type=gha,scope=${{ inputs.name }}-${{ inputs.version }}
+          cache-from: type=registry,ref=${{ format('ghcr.io/{0}/{1}:buildcache', steps.ref.outputs.owner, inputs.name) }}
 
       # Signed provenance needs a public repository (or an Enterprise plan); skipped silently otherwise.
       - name: Attest build provenance
