@@ -19,6 +19,10 @@ ARG WASM_PACK_VERSION=0.14.0
 # Extra tools for building a Flutter app (flutter-rust image): wasm-opt and protoc + protoc_plugin.
 ARG WITH_APP_TOOLS=false
 ARG PROTOC_PLUGIN_VERSION=21.1.2
+# wasm-opt must be the version wasm-pack itself downloads (117), not the Ubuntu package (108): 108 rewrote the wasm of
+# flutter_rust_bridge 2.13 so the externref table export pointed at the function table, and the web app could not start its Rust core.
+ARG BINARYEN_VERSION=117
+ARG BINARYEN_SHA256=3dc677006555b355ea2da5e82602065a161d5e83eaefd3f759afa00b96e83212
 
 # System-wide locations: GitHub Actions swaps HOME, so nothing may live under /root or $HOME.
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -49,8 +53,14 @@ RUN set -eu; \
 # wasm-opt (binaryen) is used by wasm-pack, which otherwise downloads it on every run.
 # protoc_plugin is pinned to the line that matches protobuf ^3.1.0 used by the app's gRPC client.
 RUN set -eu; [ "$WITH_APP_TOOLS" = "true" ] || exit 0; \
-    apt-get update && apt-get install -y --no-install-recommends binaryen protobuf-compiler \
+    apt-get update && apt-get install -y --no-install-recommends protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*; \
+    curl --proto '=https' --tlsv1.2 -fsSL -o /tmp/binaryen.tar.gz \
+        "https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz"; \
+    echo "${BINARYEN_SHA256}  /tmp/binaryen.tar.gz" | sha256sum -c -; \
+    mkdir -p /opt/binaryen && tar -xzf /tmp/binaryen.tar.gz -C /opt/binaryen --strip-components=1; \
+    rm -f /tmp/binaryen.tar.gz; \
+    ln -s /opt/binaryen/bin/wasm-opt /usr/local/bin/wasm-opt; \
     dart pub global activate protoc_plugin "${PROTOC_PLUGIN_VERSION}"; \
     chmod -R a+rwX "$PUB_CACHE"; \
     protoc --version; wasm-opt --version; command -v protoc-gen-dart
