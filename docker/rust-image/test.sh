@@ -19,5 +19,8 @@ run 'mkdir /t && git init -q /t && chown -R 1234:1234 /t && cd /t && git status 
 if [ "$mode" = "flutter" ]; then
   run 'flutter --version >/dev/null && command -v rustc >/dev/null' || { echo "FAIL: flutter missing in flutter-rust"; exit 1; }
   run 'wasm-opt --version && protoc --version && command -v protoc-gen-dart' || { echo "FAIL: wasm-opt/protoc/protoc-gen-dart"; exit 1; }
+  # wasm-opt must be the version in the Dockerfile (the one wasm-pack uses), not the older Ubuntu package that broke the web wasm.
+  binaryen_expected="$(sed -n 's/^ARG BINARYEN_VERSION=//p' "$(dirname "$0")/Dockerfile")"
+  run "wasm-opt --version | grep -q 'version_$binaryen_expected'" || { echo "FAIL: wasm-opt is not version_$binaryen_expected"; exit 1; }
 fi
 echo "OK: $image"
