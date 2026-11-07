@@ -1,0 +1,24 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Raises the toolchain versions pinned in the Dockerfiles, found by a `# renovate: datasource=... depName=...` comment above the ARG. Dependabot keeps github-actions and the digest of the base images. FRB_VERSION is not here on purpose: it must match the app.",
+  "enabledManagers": [
+    "custom.regex"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)Dockerfile$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)\\s+ARG [A-Z_]+=(?<currentValue>\\S+)"
+      ],
+      "versioningTemplate": "semver"
+    }
+  ],
+  "timezone": "America/Sao_Paulo",
+  "schedule": [
+    "before 6am on the first day of the month"
+  ],
+  "prConcurrentLimit": 2
+}
