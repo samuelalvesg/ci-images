@@ -41,6 +41,10 @@ on:
         description: Remove preinstalled toolchains from the runner before building (needed by the large Android image)
         type: boolean
         default: false
+      versions:
+        description: "Newline-separated `Label=command` pairs run inside the image for the job summary (first output line is the version)"
+        type: string
+        default: ""
     outputs:
       image:
         value: ${{ jobs.build.outputs.image }}
@@ -58,6 +62,10 @@ jobs:
       skipped: ${{ steps.reuse.outputs.skip }}
     steps:
       - uses: actions/checkout@v7
+
+      - name: Start time (for the job summary)
+        id: clock
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
 
       # The large Android image (base + SDK + NDK + Gradle cache + build cache) needs about 30 GB. The ubuntu-24.04 runner has
       # 145 GB of disk and about 78 GB free (measured), so the preinstalled toolchains are removed only when the free space is
@@ -129,8 +137,7 @@ jobs:
           tag="$REPO:content-$hash"
           skip=false
           if [ "$CAN_SKIP" = "true" ] && docker buildx imagetools inspect "$tag" >/dev/null 2>&1; then skip=true; fi
-          { echo "hash=$hash"; echo "skip=$skip"; echo "tag=$tag"; } >> "$GITHUB_OUTPUT"
-          echo "content hash $hash - reuse published image: $skip" >> "$GITHUB_STEP_SUMMARY"
+          { echo "hash=$hash"; echo "skip=$skip"; echo "tag=$tag"; echo "base_digest=$base_digest"; } >> "$GITHUB_OUTPUT"
 
       - name: OCI labels
         id: labels
@@ -176,11 +183,16 @@ jobs:
           config: .hadolint.yaml
           failure-threshold: error
 
-      # Report only for now: base images carry unfixed CVEs that would block every publish.
-      # Only when publishing: the scan only reports (it never fails the run), and on the largest image it took 223 s of every
-      # pull request run. The result of a publication is in the job log of the run on main.
+      # Report only for now: base images carry unfixed CVEs that would block every publish. The scan only reports, so neither its
+      # findings nor a failure of the scanner itself (the large Android image hit the default 5 minute limit and took the
+      # publication down with it) may stop the push: `continue-on-error`, and the job summary says whether it finished.
+      # Vulnerabilities only (no secret scanning, which is what made the 11 GB image slow) and a limit of 15 minutes.
+      # Only when publishing: on the largest image it took 223 s of every pull request run. The result of a publication is in
+      # the job log of the run on main.
       - name: Scan image for vulnerabilities
+        id: scan
         if: inputs.publish && steps.reuse.outputs.skip != 'true'
+        continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           image-ref: ${{ steps.ref.outputs.image }}
@@ -188,7 +200,8 @@ jobs:
           ignore-unfixed: true
           exit-code: "0"
           format: table
-
+          scanners: vuln
+          timeout: 15m
       - name: Push all tags
         id: push
         if: inputs.publish && steps.reuse.outputs.skip != 'true'
@@ -216,13 +229,32 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
-      - name: Summary
-        if: inputs.publish && steps.reuse.outputs.skip != 'true'
+      # Never fails the job (it only reports) and also runs when an earlier step failed.
+      - name: Job summary
+        if: always()
+        continue-on-error: true
         env:
+          NAME: ${{ inputs.name }}
+          VERSION: ${{ inputs.version }}
+          IMAGE: ${{ steps.ref.outputs.image }}
           TAGS: ${{ steps.ref.outputs.tags }}
           DIGEST: ${{ steps.push.outputs.digest }}
-        run: |
-          { echo "### Published"; echo '```'; echo "$TAGS"; echo '```'; echo "Digest: \`$DIGEST\`"; } >> "$GITHUB_STEP_SUMMARY"
+          HASH: ${{ steps.reuse.outputs.hash }}
+          HASH_TAG: ${{ steps.reuse.outputs.tag }}
+          BASE: ${{ inputs.base_image_name != '' && format('ghcr.io/{0}/{1}:{2}', steps.ref.outputs.owner, inputs.base_image_name, inputs.version) || '' }}
+          BASE_DIGEST: ${{ steps.reuse.outputs.base_digest }}
+          VERSIONS: ${{ inputs.versions }}
+          PUBLISH: ${{ inputs.publish }}
+          SKIPPED: ${{ steps.reuse.outputs.skip }}
+          SCAN_OUTCOME: ${{ steps.scan.outcome }}
+          JOB_STATUS: ${{ job.status }}
+          STARTED: ${{ steps.clock.outputs.started }}
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash .github/scripts/build-summary.sh
 
   # Proves the pushed image works as a `container:` of a job (HOME swapped, checkout owned by another uid).
   use-as-ci-container:
