@@ -8,7 +8,7 @@ on:
       flutter_version:
         description: Flutter stable version
         required: true
-        default: "3.47.5"
+        default: "3.47.9"
       dotnet_version:
         description: ".NET SDK channel (major.minor)"
         required: true
@@ -55,7 +55,7 @@ jobs:
           FLOATING: ${{ inputs.publish_floating_tags }}
         run: |
           {
-            echo "flutter=${FLUTTER:-3.47.5}"
+            echo "flutter=${FLUTTER:-3.47.9}"
             echo "dotnet=${DOTNET:-10.0}"
             echo "floating=${FLOATING:-true}"
             if [ "${{ github.event_name }}" = "pull_request" ]; then echo "publish=false"; else echo "publish=true"; fi

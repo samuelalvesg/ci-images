@@ -8,10 +8,10 @@ e como `FROM` de qualquer Dockerfile (Coolify, Docker, Podman).
 
 | Imagem | O que traz | Tags |
 |---|---|---|
-| `ghcr.io/samuelalvesg/flutter` | Ubuntu 24.04, Flutter SDK oficial (web habilitado), `clang`, `cmake`, `ninja` | `3.47.5`, `3.47`, `latest` |
-| `ghcr.io/samuelalvesg/flutter-rust` | a imagem `flutter` + Rust (stable e nightly fixa com `wasm32` e `rust-src`), `flutter_rust_bridge_codegen`, `wasm-pack`, `wasm-opt`, `protoc` + `protoc-gen-dart` | `3.47.5`, `3.47`, `latest` (mesma versão do Flutter) |
-| `ghcr.io/samuelalvesg/flutter-linux` | a imagem `flutter-rust` + toolchain do Flutter para Linux desktop: GTK3, gstreamer, libsecret, appindicator | `3.47.5`, `3.47`, `latest` (mesma versão do Flutter) |
-| `ghcr.io/samuelalvesg/flutter-android` | a imagem `flutter-rust` + JDK 17, Android SDK (plataforma 36, build-tools 36.0.0, NDK 28.2.13676358) e os 4 alvos Rust do Android | `3.47.5`, `3.47`, `latest` (mesma versão do Flutter) |
+| `ghcr.io/samuelalvesg/flutter` | Ubuntu 24.04, Flutter SDK oficial (web habilitado), `clang`, `cmake`, `ninja` | `3.47.9`, `3.47`, `latest` |
+| `ghcr.io/samuelalvesg/flutter-rust` | a imagem `flutter` + Rust (stable e nightly fixa com `wasm32` e `rust-src`), `flutter_rust_bridge_codegen`, `wasm-pack`, `wasm-opt`, `protoc` + `protoc-gen-dart` | `3.47.9`, `3.47`, `latest` (mesma versão do Flutter) |
+| `ghcr.io/samuelalvesg/flutter-linux` | a imagem `flutter-rust` + toolchain do Flutter para Linux desktop: GTK3, gstreamer, libsecret, appindicator | `3.47.9`, `3.47`, `latest` (mesma versão do Flutter) |
+| `ghcr.io/samuelalvesg/flutter-android` | a imagem `flutter-rust` + JDK 17, Android SDK (plataforma 36, build-tools 36.0.0, NDK 28.2.13676358) e os 4 alvos Rust do Android | `3.47.9`, `3.47`, `latest` (mesma versão do Flutter) |
 | `ghcr.io/samuelalvesg/rust` | Ubuntu 24.04, Rust (stable e nightly fixa com `wasm32`), `clippy`, `rustfmt`, `flutter_rust_bridge_codegen`, `wasm-pack` | `1.0.0`, `1.0`, `latest` |
 | `ghcr.io/samuelalvesg/dotnet` | SDK .NET 10, `dotnet-ef`, `python3`, `jq` | `10.0.0`, `10.0`, `latest` |
 
@@ -43,7 +43,7 @@ jobs:
   web:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/samuelalvesg/flutter-rust:3.47.5
+      image: ghcr.io/samuelalvesg/flutter-rust:3.47.9
     steps:
       - uses: actions/checkout@v4
       - run: flutter pub get && flutter analyze && flutter test
@@ -64,7 +64,7 @@ Testes .NET com Testcontainers precisam do socket do Docker do host:
 ## Usar como base de Dockerfile
 
 ```dockerfile
-FROM ghcr.io/samuelalvesg/flutter-rust:3.47.5 AS build-env
+FROM ghcr.io/samuelalvesg/flutter-rust:3.47.9 AS build-env
 WORKDIR /app
 COPY . .
 RUN flutter build web --release --wasm

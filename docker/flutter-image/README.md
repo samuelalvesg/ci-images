@@ -4,7 +4,7 @@ Ubuntu 24.04 + Flutter SDK oficial (plataforma web habilitada) + toolchain nativ
 `ninja`). Alternativa à `ghcr.io/cirruslabs/flutter`, que parou na 3.44.0.
 
 ```dockerfile
-FROM ghcr.io/samuelalvesg/flutter:3.47.5
+FROM ghcr.io/samuelalvesg/flutter:3.47.9
 ```
 
 Uso no GitHub Actions, tags e variáveis: ver o [README](../../README.md). Android e iOS não estão habilitados nesta imagem.
