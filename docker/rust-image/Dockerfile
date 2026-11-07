@@ -9,9 +9,12 @@ ARG BASE=ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef
 FROM ${BASE}
 
 # A fixed Rust version, so rebuilding the image does not silently change the compiler. Raise it on purpose.
+# renovate: datasource=github-releases depName=rust-lang/rust
 ARG RUST_STABLE=1.99.1
 ARG RUST_NIGHTLY=nightly-2026-06-01
+# FRB_VERSION follows the flutter_rust_bridge of the app (pubspec.yaml, Cargo.toml, generated code), so Renovate does not touch it.
 ARG FRB_VERSION=2.13.0
+# renovate: datasource=crate depName=wasm-pack
 ARG WASM_PACK_VERSION=0.14.0
 # Extra tools for building a Flutter app (flutter-rust image): wasm-opt and protoc + protoc_plugin.
 ARG WITH_APP_TOOLS=false

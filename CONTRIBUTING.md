@@ -14,6 +14,10 @@ Google), `RUST_STABLE`, `RUST_NIGHTLY`, `FRB_VERSION`, `WASM_PACK_VERSION`, `DOT
 `FRB_VERSION` precisa ser a mesma do `flutter_rust_bridge` do app consumidor (`pubspec.yaml`, `Cargo.toml` e o código gerado):
 o runtime recusa um código gerado por outra versão. Ao subir a versão no app, suba aqui também.
 
+O Renovate (`renovate.json`) propõe a subida de `RUST_STABLE` e `WASM_PACK_VERSION`: o `ARG` leva um comentário
+`# renovate: datasource=... depName=...` na linha de cima. Para o Renovate acompanhar outra versão, acrescente o mesmo comentário.
+`FRB_VERSION` fica de fora de propósito (segue o app). O Dependabot continua com `github-actions` e com os digests das bases.
+
 ## Pull requests
 
 Pull requests constroem e testam as imagens, sem publicar. O `flutter-rust` só roda ao publicar, porque constrói sobre a
