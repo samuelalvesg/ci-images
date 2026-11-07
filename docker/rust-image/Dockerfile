@@ -11,7 +11,7 @@ FROM ${BASE}
 # A fixed Rust version, so rebuilding the image does not silently change the compiler. Raise it on purpose.
 ARG RUST_STABLE=1.99.1
 ARG RUST_NIGHTLY=nightly-2026-06-01
-ARG FRB_VERSION=2.12.0
+ARG FRB_VERSION=2.13.0
 ARG WASM_PACK_VERSION=0.14.0
 # Extra tools for building a Flutter app (flutter-rust image): wasm-opt and protoc + protoc_plugin.
 ARG WITH_APP_TOOLS=false

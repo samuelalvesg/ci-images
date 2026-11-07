@@ -9,6 +9,9 @@ run 'rustc --version && cargo --version && cargo clippy --version && rustfmt --v
 run 'n=$(rustup toolchain list | grep nightly | cut -d" " -f1); rustup target list --installed --toolchain "$n" | grep -q wasm32-unknown-unknown' \
   || { echo "FAIL: nightly + wasm32 target"; exit 1; }
 run 'flutter_rust_bridge_codegen --version && wasm-pack --version' || { echo "FAIL: FRB/wasm-pack"; exit 1; }
+# The codegen must be the version the image says it is (label dev.frb.version), the one the apps pin in pubspec.yaml and Cargo.toml.
+frb_expected="$(docker image inspect --format '{{ index .Config.Labels "dev.frb.version" }}' "$image")"
+run "flutter_rust_bridge_codegen --version | grep -qw '$frb_expected'" || { echo "FAIL: flutter_rust_bridge_codegen is not $frb_expected"; exit 1; }
 run 'cd /tmp && cargo new --lib t -q && cd t && cargo build -q' || { echo "FAIL: trivial cargo build with swapped HOME"; exit 1; }
 # GitHub Actions checks the repository out as another user: git must not refuse it as "dubious ownership".
 run 'mkdir /t && git init -q /t && chown -R 1234:1234 /t && cd /t && git status --short >/dev/null' \
