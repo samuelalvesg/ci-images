@@ -57,6 +57,10 @@ fi
     size="$(docker image inspect --format '{{.Size}}' "$IMAGE" 2>/dev/null || true)"
     [ -n "$size" ] && echo "| Size | $(numfmt --to=iec --suffix=B "$size" 2>/dev/null || echo "$size B") on disk (uncompressed) |"
   fi
+  case "${SCAN_OUTCOME:-}" in
+    success) echo "| Vulnerability scan | ✅ finished (HIGH and CRITICAL with a fix; the findings are in the step log) |" ;;
+    failure) echo "| Vulnerability scan | ⚠️ did not finish (timeout or scanner error); the publication was not blocked |" ;;
+  esac
   d="$(duration)"; [ -n "$d" ] && echo "| Job time | $d |"
   echo
 } >> "$out"

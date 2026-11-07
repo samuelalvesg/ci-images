@@ -183,11 +183,16 @@ jobs:
           config: .hadolint.yaml
           failure-threshold: error
 
-      # Report only for now: base images carry unfixed CVEs that would block every publish.
-      # Only when publishing: the scan only reports (it never fails the run), and on the largest image it took 223 s of every
-      # pull request run. The result of a publication is in the job log of the run on main.
+      # Report only for now: base images carry unfixed CVEs that would block every publish. The scan only reports, so neither its
+      # findings nor a failure of the scanner itself (the large Android image hit the default 5 minute limit and took the
+      # publication down with it) may stop the push: `continue-on-error`, and the job summary says whether it finished.
+      # Vulnerabilities only (no secret scanning, which is what made the 11 GB image slow) and a limit of 15 minutes.
+      # Only when publishing: on the largest image it took 223 s of every pull request run. The result of a publication is in
+      # the job log of the run on main.
       - name: Scan image for vulnerabilities
+        id: scan
         if: inputs.publish && steps.reuse.outputs.skip != 'true'
+        continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           image-ref: ${{ steps.ref.outputs.image }}
@@ -195,7 +200,8 @@ jobs:
           ignore-unfixed: true
           exit-code: "0"
           format: table
-
+          scanners: vuln
+          timeout: 15m
       - name: Push all tags
         id: push
         if: inputs.publish && steps.reuse.outputs.skip != 'true'
@@ -240,6 +246,7 @@ jobs:
           VERSIONS: ${{ inputs.versions }}
           PUBLISH: ${{ inputs.publish }}
           SKIPPED: ${{ steps.reuse.outputs.skip }}
+          SCAN_OUTCOME: ${{ steps.scan.outcome }}
           JOB_STATUS: ${{ job.status }}
           STARTED: ${{ steps.clock.outputs.started }}
           EVENT: ${{ github.event_name }}
