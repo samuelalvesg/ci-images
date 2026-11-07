@@ -17,6 +17,15 @@ o runtime recusa um código gerado por outra versão. Ao subir a versão no app,
 O Renovate (`renovate.json`) propõe a subida de `RUST_STABLE` e `WASM_PACK_VERSION`: o `ARG` leva um comentário
 `# renovate: datasource=... depName=...` na linha de cima. Para o Renovate acompanhar outra versão, acrescente o mesmo comentário.
 `FRB_VERSION` fica de fora de propósito (segue o app). O Dependabot continua com `github-actions` e com os digests das bases.
+## Resumo de cada build
+
+Cada job de imagem escreve um resumo na aba do run (resultado, origem, base e digest, tamanho, tempo e as versões das
+ferramentas dentro da imagem). O que aparece em "Inside the image" vem da entrada `versions` do job em
+`.github/workflows/flutter-image.yml`: uma linha `Rótulo=comando` por ferramenta, executada dentro da imagem (vale a
+primeira linha da saída; comando que falha vira `n/a`). Ao criar uma imagem nova, declare a lista dela. O gerador é
+`.github/scripts/build-summary.sh` e dá para testá-lo à mão: `NAME=x VERSION=1 IMAGE=<imagem local> VERSIONS=$'A=comando' bash
+.github/scripts/build-summary.sh`. Ele só informa: nunca derruba o build. A varredura de vulnerabilidades continua no log do passo
+dela.
 
 ## Pull requests
 

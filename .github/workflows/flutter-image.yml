@@ -71,6 +71,11 @@ jobs:
       context: docker/flutter-image
       build_args: FLUTTER_VERSION=${{ needs.versions.outputs.flutter }}
       description: "Flutter SDK (stable, web) on Ubuntu 24.04 - ready-to-use Docker image for GitHub Actions CI and Coolify/Docker builds. Tags: X.Y.Z, X.Y, latest"
+      versions: |
+        Flutter=flutter --version | head -1
+        Dart=dart --version
+        Ubuntu=. /etc/os-release && echo "$PRETTY_NAME"
+        Git=git --version
       test_command: docker/flutter-image/test.sh "$IMAGE" "${{ needs.versions.outputs.flutter }}"
       publish: ${{ needs.versions.outputs.publish == 'true' }}
       floating_tags: ${{ needs.versions.outputs.floating == 'true' }}
@@ -89,6 +94,15 @@ jobs:
       base_image_name: flutter
       build_args: WITH_APP_TOOLS=true
       description: "Flutter + Rust (stable, pinned nightly, wasm32), flutter_rust_bridge_codegen, wasm-pack, wasm-opt and protoc - Docker image for Flutter web/WASM CI with native Rust. Tags: X.Y.Z, X.Y, latest"
+      versions: |
+        Flutter=flutter --version | head -1
+        Dart=dart --version
+        Rust (stable)=rustc --version
+        Rust (nightly)=rustc +"$(rustup toolchain list | grep nightly | cut -d' ' -f1)" --version
+        flutter_rust_bridge_codegen=flutter_rust_bridge_codegen --version
+        wasm-pack=wasm-pack --version
+        wasm-opt=wasm-opt --version
+        protoc=protoc --version
       test_command: docker/rust-image/test.sh "$IMAGE" flutter
       publish: ${{ needs.versions.outputs.publish == 'true' }}
       floating_tags: ${{ needs.versions.outputs.floating == 'true' }}
@@ -106,6 +120,15 @@ jobs:
       context: docker/linux-image
       base_image_name: flutter-rust
       description: "Flutter + Rust + Linux desktop toolchain (GTK3, gstreamer, libsecret, appindicator) - Docker image to build Flutter apps for Linux in CI. Tags: X.Y.Z, X.Y, latest"
+      versions: |
+        Flutter=flutter --version | head -1
+        Dart=dart --version
+        Rust (stable)=rustc --version
+        flutter_rust_bridge_codegen=flutter_rust_bridge_codegen --version
+        CMake=cmake --version
+        Clang=clang --version
+        GTK 3=pkg-config --modversion gtk+-3.0
+        Ninja=ninja --version
       test_command: docker/linux-image/test.sh "$IMAGE"
       publish: ${{ needs.versions.outputs.publish == 'true' }}
       floating_tags: ${{ needs.versions.outputs.floating == 'true' }}
@@ -122,6 +145,17 @@ jobs:
       context: docker/android-image
       base_image_name: flutter-rust
       description: "Flutter + Rust + Android toolchain (JDK 17, SDK 36, NDK 28.2, Rust Android targets) - Docker image to build Flutter APKs and app bundles in CI. Tags: X.Y.Z, X.Y, latest"
+      versions: |
+        Flutter=flutter --version | head -1
+        Dart=dart --version
+        Rust (stable)=rustc --version
+        flutter_rust_bridge_codegen=flutter_rust_bridge_codegen --version
+        Java=java -version
+        Android platform=ls "$ANDROID_HOME/platforms"
+        Build tools=ls "$ANDROID_HOME/build-tools" | sort -V | tail -1
+        NDK=ls "$ANDROID_HOME/ndk"
+        Gradle (baked in)=ls "$GRADLE_USER_HOME/wrapper/dists" | grep "^gradle-" | head -1
+        Rust targets=rustup target list --installed | tr '\n' ' '
       test_command: docker/android-image/test.sh "$IMAGE"
       publish: ${{ needs.versions.outputs.publish == 'true' }}
       floating_tags: ${{ needs.versions.outputs.floating == 'true' }}
@@ -136,6 +170,11 @@ jobs:
       version: "1.0.0"
       context: docker/rust-image
       description: "Rust (stable + pinned nightly, wasm32, clippy, rustfmt), flutter_rust_bridge_codegen and wasm-pack preinstalled - Docker image for Rust/WASM CI. Tags: 1.0.0, 1.0, latest"
+      versions: |
+        Rust (stable)=rustc --version
+        Rust (nightly)=rustc +"$(rustup toolchain list | grep nightly | cut -d' ' -f1)" --version
+        flutter_rust_bridge_codegen=flutter_rust_bridge_codegen --version
+        wasm-pack=wasm-pack --version
       test_command: docker/rust-image/test.sh "$IMAGE"
       publish: ${{ needs.versions.outputs.publish == 'true' }}
       floating_tags: ${{ needs.versions.outputs.floating == 'true' }}
@@ -150,6 +189,12 @@ jobs:
       context: docker/dotnet-image
       build_args: DOTNET_VERSION=${{ needs.versions.outputs.dotnet }}
       description: ".NET SDK (10.0) with dotnet-ef, python3 and jq preinstalled - Docker image for ASP.NET/EF Core CI on GitHub Actions. Tags: X.Y.Z, X.Y, latest"
+      versions: |
+        .NET SDK=dotnet --version
+        dotnet-ef=dotnet-ef --version
+        Python=python3 --version
+        jq=jq --version
+        Git=git --version
       test_command: docker/dotnet-image/test.sh "$IMAGE" "${{ needs.versions.outputs.dotnet }}"
       publish: ${{ needs.versions.outputs.publish == 'true' }}
       floating_tags: ${{ needs.versions.outputs.floating == 'true' }}
