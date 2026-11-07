@@ -11,6 +11,9 @@ docker build -t dotnet:10.0 --build-arg DOTNET_VERSION=10.0 docker/dotnet-image 
 Build args: `FLUTTER_VERSION` (qualquer versão do canal `stable`; o SHA-256 do tarball é conferido contra o manifesto do
 Google), `RUST_STABLE`, `RUST_NIGHTLY`, `FRB_VERSION`, `WASM_PACK_VERSION`, `DOTNET_VERSION`, `DOTNET_EF_VERSION`.
 
+`FRB_VERSION` precisa ser a mesma do `flutter_rust_bridge` do app consumidor (`pubspec.yaml`, `Cargo.toml` e o código gerado):
+o runtime recusa um código gerado por outra versão. Ao subir a versão no app, suba aqui também.
+
 ## Pull requests
 
 Pull requests constroem e testam as imagens, sem publicar. O `flutter-rust` só roda ao publicar, porque constrói sobre a
