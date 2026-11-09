@@ -96,7 +96,7 @@ jobs:
       COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}            # token da API, se o webhook exigir
 ```
 
-Entradas: `image_name`, `version`, `ref`, `context`, `dockerfile`, `build_args`, `submodules`, `deploy`, `environment`. Segredos:
+Entradas: `image_name`, `version`, `platforms` (padrão `linux/amd64,linux/arm64`, porque o servidor do Coolify é um Ampere A1), `ref`, `context`, `dockerfile`, `build_args`, `submodules`, `deploy`, `environment`. Segredos:
 `BUILD_ARGS_SECRET` (build args secretos, uma linha `CHAVE=valor` cada), `SUBMODULE_TOKEN`, `COOLIFY_URL`,
 `COOLIFY_DEPLOY_URL`, `COOLIFY_TOKEN`. O job de deploy usa o *environment* `production`: configure revisores obrigatórios nele
 para exigir aprovação manual. Saídas: `image` e `digest`.
