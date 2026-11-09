@@ -1,0 +1,78 @@
+name: Clean up old package versions
+
+# Manual only. Lists (dry run, the default) or deletes old versions of the CI image packages in GHCR.
+# A version is kept when it carries `latest`, `buildcache` or a floating `X.Y` tag, when it is among the newest `keep`
+# versions of the package, or when it is younger than `min_age_days`. Untagged versions are never touched: they can be
+# the per-platform children of a multi-arch manifest that a kept tag still points to.
+on:
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: Comma-separated package names (must be linked to this repository)
+        default: flutter,flutter-rust,flutter-linux,flutter-android,rust,dotnet
+      keep:
+        description: Newest versions to keep per package, whatever their tags
+        default: "3"
+      min_age_days:
+        description: Never delete a version younger than this many days
+        default: "7"
+      delete:
+        description: Really delete (unchecked = only list what would be deleted)
+        type: boolean
+        default: false
+      confirm:
+        description: Type DELETE to allow a real deletion
+        default: ""
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  clean:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      OWNER: ${{ github.repository_owner }}
+      PACKAGES: ${{ inputs.packages }}
+      KEEP: ${{ inputs.keep }}
+      MIN_AGE_DAYS: ${{ inputs.min_age_days }}
+      DELETE: ${{ inputs.delete }}
+      CONFIRM: ${{ inputs.confirm }}
+    steps:
+      - name: Validate inputs
+        run: |
+          [[ "$KEEP" =~ ^[0-9]+$ && "$KEEP" -ge 1 ]] || { echo "keep must be a number >= 1"; exit 1; }
+          [[ "$MIN_AGE_DAYS" =~ ^[0-9]+$ ]] || { echo "min_age_days must be a number"; exit 1; }
+          if [ "$DELETE" = "true" ] && [ "$CONFIRM" != "DELETE" ]; then
+            echo "A real deletion needs the confirmation DELETE"; exit 1
+          fi
+
+      - name: List and delete
+        run: |
+          cutoff="$(date -u -d "-$MIN_AGE_DAYS days" +%Y-%m-%dT%H:%M:%SZ)"
+          total=0
+          for pkg in $(echo "$PACKAGES" | tr ',' ' '); do
+            echo "::group::$pkg"
+            versions="$(gh api --paginate "/users/$OWNER/packages/container/$pkg/versions?per_page=100" | jq -s 'add // []')"
+            ids="$(jq -r --argjson keep "$KEEP" --arg cutoff "$cutoff" '
+              sort_by(.created_at) | reverse
+              | to_entries
+              | map(select(.key >= $keep) | .value)
+              | map(select(.created_at < $cutoff))
+              | map(select((.metadata.container.tags | length) > 0))
+              | map(select(all(.metadata.container.tags[]; . != "latest" and . != "buildcache" and (test("^[0-9]+\\.[0-9]+$") | not))))
+              | .[] | "\(.id) \(.metadata.container.tags | join(","))"' <<<"$versions")"
+            if [ -z "$ids" ]; then echo "nothing to delete"; echo "::endgroup::"; continue; fi
+            while read -r id tags; do
+              total=$((total + 1))
+              if [ "$DELETE" = "true" ]; then
+                gh api -X DELETE "/users/$OWNER/packages/container/$pkg/versions/$id" && echo "deleted $id ($tags)"
+              else
+                echo "would delete $id ($tags)"
+              fi
+            done <<<"$ids"
+            echo "::endgroup::"
+          done
+          mode="would be deleted"; [ "$DELETE" = "true" ] && mode="deleted"
+          echo "### $total version(s) $mode" >> "$GITHUB_STEP_SUMMARY"

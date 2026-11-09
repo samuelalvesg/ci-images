@@ -101,6 +101,23 @@ Entradas: `image_name`, `version`, `platforms` (padrão `linux/amd64,linux/arm64
 `COOLIFY_DEPLOY_URL`, `COOLIFY_TOKEN`. O job de deploy usa o *environment* `production`: configure revisores obrigatórios nele
 para exigir aprovação manual. Saídas: `image` e `digest`.
 
+## Tags dos pacotes no GHCR e limpeza
+
+| Tag | Onde | O que é |
+|---|---|---|
+| `X.Y.Z` | imagens de CI | versão (Flutter nas `flutter*`, `10.0.0` na `dotnet`; `rust` é a versão da própria imagem, `1.0.0`) |
+| `X.Y-sha-<commit>` | imagens de CI | o build exato daquele commit |
+| `X.Y`, `latest` | imagens de CI | se movem a cada publicação |
+| `content-<hash>` | imagens de CI | conteúdo já construído e testado; é por ele que um build é reaproveitado |
+| `buildcache` | todas | cache de camadas, não é para uso |
+| `sha-<commit>` | imagens de aplicação | o build exato daquele commit |
+| `vX.Y.Z`, `latest` | imagens de aplicação | só existem quando o release manual informa a versão |
+
+O GHCR não remove versões sozinho. O workflow manual `limpar-pacotes.yml` lista (padrão) ou apaga versões antigas:
+mantém `latest`, `buildcache`, `X.Y`, as `keep` mais recentes de cada pacote e tudo mais novo que `min_age_days`;
+versões sem tag nunca são tocadas (podem ser filhas de um manifesto multi-arquitetura). Apagar de verdade exige
+`delete` marcado e a confirmação `DELETE`. Só alcança pacotes ligados a este repositório.
+
 ## Licença
 
 Apache-2.0 para os Dockerfiles e scripts deste repositório (ver [`LICENSE`](LICENSE)). O Flutter SDK (BSD-3), o .NET SDK (MIT),
