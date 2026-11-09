@@ -1,0 +1,61 @@
+name: Release assets from image (reusable)
+
+# Extracts a directory from an image already published by cd-image.yml, packs it as a tar.gz with a SHA-256 file and attaches both
+# to the GitHub Release of the calling repository (created on the first call, so the build is reused instead of repeated).
+# Only for the manual release flow: the tag is created by this run, on the commit the caller ran from (GITHUB_SHA).
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: Image reference to extract from (the `image` output of cd-image.yml)
+        required: true
+        type: string
+      path_in_image:
+        description: Directory inside the image (for example /app or /usr/share/nginx/html)
+        required: true
+        type: string
+      asset_name:
+        description: Asset name without extension (the tag is appended)
+        required: true
+        type: string
+      tag:
+        description: Release tag
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract and pack
+        env:
+          IMAGE: ${{ inputs.image }}
+          SRC: ${{ inputs.path_in_image }}
+          NAME: ${{ inputs.asset_name }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -eu
+          id="$(docker create "$IMAGE")"
+          mkdir -p out/content dist
+          docker cp "$id:$SRC/." out/content/
+          docker rm "$id" >/dev/null
+          tar -C out -czf "dist/$NAME-$TAG.tar.gz" content
+          (cd dist && sha256sum "$NAME-$TAG.tar.gz" > "$NAME-$TAG.tar.gz.sha256")
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --generate-notes ${{ contains(inputs.tag, '-') && '--prerelease' || '' }}
+          fi
