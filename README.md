@@ -105,3 +105,9 @@ para exigir aprovação manual. Saídas: `image` e `digest`.
 
 Apache-2.0 para os Dockerfiles e scripts deste repositório (ver [`LICENSE`](LICENSE)). O Flutter SDK (BSD-3), o .NET SDK (MIT),
 o Rust (MIT/Apache-2.0) e os pacotes Ubuntu dentro das imagens mantêm as licenças próprias.
+
+## Release a partir de uma imagem publicada (`release-from-image.yml`)
+
+Workflow reutilizável: extrai uma pasta da imagem que o `cd-image.yml` acabou de publicar (por exemplo `/app` do backend ou o `web` do frontend),
+empacota em `.tar.gz` com `.sha256` e anexa ao GitHub Release do repositório chamador (cria o release se não existir). Assim o binário do release
+é exatamente o que está na imagem, sem segundo build. Use só em tag de versão: `if: github.ref_type == 'tag'`.
