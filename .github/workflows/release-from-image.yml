@@ -2,7 +2,7 @@ name: Release assets from image (reusable)
 
 # Extracts a directory from an image already published by cd-image.yml, packs it as a tar.gz with a SHA-256 file and attaches both
 # to the GitHub Release of the calling repository (created on the first call, so the build is reused instead of repeated).
-# Only for version tags: the caller guards it with `if: github.ref_type == 'tag'`.
+# Only for the manual release flow: the tag is created by this run, on the commit the caller ran from (GITHUB_SHA).
 on:
   workflow_call:
     inputs:
@@ -57,5 +57,5 @@ jobs:
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes ${{ contains(inputs.tag, '-') && '--prerelease' || '' }}
+            gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --generate-notes ${{ contains(inputs.tag, '-') && '--prerelease' || '' }}
           fi
