@@ -79,9 +79,9 @@ RUN flutter build web --release --wasm
 
 ## Entrega contínua (workflow reutilizável)
 
-`.github/workflows/cd-image.yml` constrói a imagem de uma aplicação, publica em `ghcr.io/<dono>/<imagem>` (tag `sha-<commit>` sempre; numa
-tag de versão do Git, também `<tag>` e `latest`) e, se pedido, chama a API de deploy do Coolify. Chame-o de qualquer repositório,
-de preferência com um gatilho intencional (`push: tags: ["v*"]` e `workflow_dispatch`), nunca a cada push em `main`:
+`.github/workflows/cd-image.yml` constrói a imagem de uma aplicação, publica em `ghcr.io/<dono>/<imagem>` (tag `sha-<commit>` sempre; com a entrada `version`, também `<version>` e `latest`) e, se
+pedido, chama a API de deploy do Coolify. Chame-o de qualquer repositório **só por `workflow_dispatch`** (versão digitada, confirmação
+`RELEASE`, execução apenas a partir da `main`, *environment* `release` com revisores), nunca por push, merge ou tag:
 
 ```yaml
 jobs:
@@ -96,7 +96,7 @@ jobs:
       COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}            # token da API, se o webhook exigir
 ```
 
-Entradas: `image_name`, `ref`, `context`, `dockerfile`, `build_args`, `submodules`, `deploy`, `environment`. Segredos:
+Entradas: `image_name`, `version`, `ref`, `context`, `dockerfile`, `build_args`, `submodules`, `deploy`, `environment`. Segredos:
 `BUILD_ARGS_SECRET` (build args secretos, uma linha `CHAVE=valor` cada), `SUBMODULE_TOKEN`, `COOLIFY_URL`,
 `COOLIFY_DEPLOY_URL`, `COOLIFY_TOKEN`. O job de deploy usa o *environment* `production`: configure revisores obrigatórios nele
 para exigir aprovação manual. Saídas: `image` e `digest`.
@@ -110,4 +110,4 @@ o Rust (MIT/Apache-2.0) e os pacotes Ubuntu dentro das imagens mantêm as licen�
 
 Workflow reutilizável: extrai uma pasta da imagem que o `cd-image.yml` acabou de publicar (por exemplo `/app` do backend ou o `web` do frontend),
 empacota em `.tar.gz` com `.sha256` e anexa ao GitHub Release do repositório chamador (cria o release se não existir). Assim o binário do release
-é exatamente o que está na imagem, sem segundo build. Use só em tag de versão: `if: github.ref_type == 'tag'`.
+é exatamente o que está na imagem, sem segundo build. Chame-o só no fluxo manual de release; a tag é criada por esta execução (`gh release create --target <commit>`), não por push de tag.

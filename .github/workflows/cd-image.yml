@@ -9,6 +9,10 @@ on:
         description: Image name under ghcr.io/<owner>/ (for example symmetris-backend)
         required: true
         type: string
+      version:
+        description: Version tag to publish besides sha-<commit> (for example v1.4.0); empty = only sha-<commit>, `latest` does not move
+        type: string
+        default: ""
       ref:
         description: Commit to build (default - the commit that triggered the caller)
         type: string
@@ -83,16 +87,15 @@ jobs:
         env:
           NAME: ${{ inputs.image_name }}
           OWNER: ${{ github.repository_owner }}
-          REF_TYPE: ${{ github.ref_type }}
-          REF_NAME: ${{ github.ref_name }}
+          VERSION: ${{ inputs.version }}
         run: |
           owner="$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')"
           sha="$(git rev-parse --short=7 HEAD)"
           image="ghcr.io/$owner/$NAME"
-          # Every build is reachable by its commit (sha-<commit>). Only a version tag also gets its own version tag and moves
-          # `latest`: a manual run from a branch never changes what `latest` means.
+          # Every build is reachable by its commit (sha-<commit>). Only a run given a version also gets that version tag and
+          # moves `latest`: nothing changes what `latest` means by accident.
           tags="$image:sha-$sha"
-          if [ "$REF_TYPE" = "tag" ]; then tags="$tags"$'\n'"$image:$REF_NAME"$'\n'"$image:latest"; fi
+          if [ -n "$VERSION" ]; then tags="$tags"$'\n'"$image:$VERSION"$'\n'"$image:latest"; fi
           {
             echo "image=$image:sha-$sha"
             echo "tags<<EOF"; echo "$tags"; echo "EOF"
