@@ -1,7 +1,7 @@
 # Linux desktop toolchain on top of the flutter-rust image: the GTK3 embedder dependencies and the libraries that the
 # plugins used by the app need (gstreamer for audio, libsecret for secure storage, appindicator for the tray).
 # Licensed under Apache-2.0 (see LICENSE); the Ubuntu packages keep their own licenses.
-ARG BASE=ghcr.io/samuelalvesg/flutter-rust:3.47.9
+ARG BASE=ghcr.io/samuelalvesg/flutter-rust:3.50.0
 FROM ${BASE}
 
 ENV DEBIAN_FRONTEND=noninteractive

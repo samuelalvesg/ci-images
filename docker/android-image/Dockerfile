@@ -3,7 +3,7 @@
 # The SDK, Gradle cache and Java live in system paths: GitHub Actions swaps HOME, so nothing may depend on /root or $HOME.
 # Licensed under Apache-2.0 (see LICENSE); the Android SDK (Android Software Development Kit License), the JDK and the
 # Ubuntu packages keep their own licenses. Building with this image means you accept the Android SDK licenses.
-ARG BASE=ghcr.io/samuelalvesg/flutter-rust:3.47.9
+ARG BASE=ghcr.io/samuelalvesg/flutter-rust:3.50.0
 FROM ${BASE}
 
 ARG ANDROID_CMDLINE_TOOLS=11076708
