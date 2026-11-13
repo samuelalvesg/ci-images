@@ -8,7 +8,7 @@ on:
       flutter_version:
         description: Flutter stable version
         required: true
-        default: "3.47.9"
+        default: "3.50.0"
       dotnet_version:
         description: ".NET SDK channel (major.minor)"
         required: true
@@ -55,7 +55,7 @@ jobs:
           FLOATING: ${{ inputs.publish_floating_tags }}
         run: |
           {
-            echo "flutter=${FLUTTER:-3.47.9}"
+            echo "flutter=${FLUTTER:-3.50.0}"
             echo "dotnet=${DOTNET:-10.0}"
             echo "floating=${FLOATING:-true}"
             if [ "${{ github.event_name }}" = "pull_request" ]; then echo "publish=false"; else echo "publish=true"; fi
@@ -119,6 +119,7 @@ jobs:
       version: ${{ needs.versions.outputs.flutter }}
       context: docker/linux-image
       base_image_name: flutter-rust
+      base_tag: ${{ needs.versions.outputs.publish == 'true' && needs.versions.outputs.flutter || 'latest' }}
       description: "Flutter + Rust + Linux desktop toolchain (GTK3, gstreamer, libsecret, appindicator) - Docker image to build Flutter apps for Linux in CI. Tags: X.Y.Z, X.Y, latest"
       versions: |
         Flutter=flutter --version | head -1
@@ -144,6 +145,7 @@ jobs:
       version: ${{ needs.versions.outputs.flutter }}
       context: docker/android-image
       base_image_name: flutter-rust
+      base_tag: ${{ needs.versions.outputs.publish == 'true' && needs.versions.outputs.flutter || 'latest' }}
       description: "Flutter + Rust + Android toolchain (JDK 17, SDK 36, NDK 28.2, Rust Android targets) - Docker image to build Flutter APKs and app bundles in CI. Tags: X.Y.Z, X.Y, latest"
       versions: |
         Flutter=flutter --version | head -1
