@@ -11,9 +11,9 @@ ARG ANDROID_PLATFORM=36
 ARG ANDROID_BUILD_TOOLS=36.0.0
 ARG ANDROID_NDK=28.2.13676358
 # Versions the app builds with (apps/symmetris/android): they decide which Gradle distribution and plugins are baked below.
-ARG GRADLE_VERSION=8.14
-ARG AGP_VERSION=8.11.1
-ARG KOTLIN_VERSION=2.2.20
+ARG GRADLE_VERSION=9.5.0
+ARG AGP_VERSION=9.3.1
+ARG KOTLIN_VERSION=2.4.20
 ARG PREWARM_GRADLE=true
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -57,8 +57,9 @@ RUN flutter config --android-sdk "${ANDROID_HOME}" >/dev/null \
 
 # Bakes the Gradle distribution, the Android Gradle Plugin, the Kotlin plugin and the Flutter engine artifacts for the
 # versions above into GRADLE_USER_HOME and the Flutter cache, so a CI build does not download them (that download is most
-# of the time of a cold Gradle build). It uses the app's versions on purpose: the Flutter 3.47.5 template uses Gradle 9.3.1,
-# AGP 9.1.0 and Kotlin 2.4.0, which would not help an app on other versions. Set PREWARM_GRADLE=false to skip it.
+# of the time of a cold Gradle build). The versions are the Flutter 3.50 template ones (Gradle 9.5.0, AGP 9.3.1, Kotlin 2.4.20);
+# Flutter 3.50 errors below Gradle 9.3.1, AGP 9.1.1 and Kotlin 2.4.10. An app on other versions only gains the Flutter engine
+# artifacts from this step. Set PREWARM_GRADLE=false to skip it.
 # The cd is into a throwaway project that is deleted in the same instruction, so WORKDIR does not apply.
 # hadolint ignore=DL3003
 RUN set -eu; [ "$PREWARM_GRADLE" = "true" ] || exit 0; \
