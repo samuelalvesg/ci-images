@@ -26,6 +26,16 @@ on:
           docs/**
           *.md
           .github/workflows/**
+      runs_on:
+        description: >-
+          Runner labels as a JSON array. Pass the caller's own labels (for example vars.RUNNER_LABELS) to keep the check on a
+          self-hosted runner: the job is billed to the calling repository, not to this one.
+        type: string
+        default: '["ubuntu-24.04"]'
+      enabled:
+        description: When false the check is skipped, the output stays empty and the caller's tests run as usual
+        type: boolean
+        default: true
     outputs:
       reuse:
         description: "'true' when the pushed commit was already tested by its pull request"
@@ -33,7 +43,8 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-24.04
+    if: ${{ inputs.enabled }}
+    runs-on: ${{ fromJSON(inputs.runs_on) }}
     timeout-minutes: 5
     permissions:
       contents: read
