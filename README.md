@@ -19,7 +19,18 @@ e como `FROM` de qualquer Dockerfile (Coolify, Docker, Podman).
 `X.Y-sha-<commit>` identifica o commit de origem. Para build reproduzível, use o digest:
 `ghcr.io/samuelalvesg/flutter@sha256:...`.
 
-**Arquitetura:** `linux/amd64`.
+**Arquitetura:** `linux/amd64`. As imagens Flutter, Rust e .NET de CI não têm `linux/arm64`, e não podem ter: o
+manifesto de releases do Flutter só publica o SDK Linux em x64. Para servidor ARM (Ampere A1, como o do Coolify), a
+regra é:
+
+- o estágio que roda o Flutter fica em `FROM --platform=$BUILDPLATFORM ghcr.io/samuelalvesg/flutter-rust:<versão>` (ou
+  `flutter`), então um build multi-arquitetura executa esse estágio uma vez em amd64 e só a imagem final vira arm64;
+- a imagem final (`nginx:alpine`, `debian:bookworm-slim`, `node`, `dart`, `rust`) já é multi-arquitetura nas bases oficiais;
+- o servidor **puxa** a imagem publicada pelo CI. Build local no Ampere com esses estágios falha com
+  `no matching manifest for linux/arm64`.
+
+O `cd-image.yml` publica `linux/amd64,linux/arm64` por padrão, com QEMU, para cobrir o `dart compile exe` do servidor
+(compilado no alvo, porque o Dart não faz compilação cruzada).
 
 **Qual imagem para qual plataforma do Flutter**
 
