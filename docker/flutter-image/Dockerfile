@@ -26,21 +26,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential clang cmake ninja-build pkg-config libglu1-mesa python3 \
     && rm -rf /var/lib/apt/lists/*
 
-# The archive hash comes from Google's release manifest and is checked before extraction, so a corrupted or
-# swapped download fails the build instead of shipping.
+# amd64: the release archive, whose hash comes from Google's release manifest and is checked before extraction, so a
+# corrupted or swapped download fails the build instead of shipping.
+# arm64: Google publishes no Linux arm64 archive, but the Flutter git tree runs on arm64 (its bin/internal scripts fetch the
+# arm64 Dart SDK and engine artifacts). The tag is cloned and its commit must equal the `hash` of the same manifest entry.
+ARG TARGETARCH
 RUN set -eu; \
     manifest=/tmp/releases_linux.json; \
     curl -fsSL https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json -o "$manifest"; \
-    archive=$(jq -r --arg v "$FLUTTER_VERSION" --arg c "$FLUTTER_CHANNEL" \
-        'first(.releases[] | select(.version==$v and .channel==$c)) | .archive' "$manifest"); \
-    sha=$(jq -r --arg v "$FLUTTER_VERSION" --arg c "$FLUTTER_CHANNEL" \
-        'first(.releases[] | select(.version==$v and .channel==$c)) | .sha256' "$manifest"); \
-    [ -n "$archive" ] && [ -n "$sha" ] || { echo "Flutter $FLUTTER_VERSION ($FLUTTER_CHANNEL) not in the release manifest" >&2; exit 1; }; \
-    curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/$archive" -o /tmp/flutter.tar.xz; \
-    printf '%s  %s\n' "$sha" /tmp/flutter.tar.xz > /tmp/flutter.sha256; \
-    sha256sum -c /tmp/flutter.sha256; \
-    mkdir -p /sdks; tar -xJf /tmp/flutter.tar.xz -C /sdks; \
-    rm -f /tmp/flutter.tar.xz /tmp/flutter.sha256 "$manifest"; \
+    entry() { jq -r --arg v "$FLUTTER_VERSION" --arg c "$FLUTTER_CHANNEL" \
+        "first(.releases[] | select(.version==\$v and .channel==\$c)) | .$1" "$manifest"; }; \
+    archive=$(entry archive); sha=$(entry sha256); commit=$(entry hash); \
+    [ -n "$archive" ] && [ -n "$sha" ] && [ -n "$commit" ] || { echo "Flutter $FLUTTER_VERSION ($FLUTTER_CHANNEL) not in the release manifest" >&2; exit 1; }; \
+    mkdir -p /sdks; \
+    if [ "${TARGETARCH:-amd64}" = "arm64" ]; then \
+        git clone --depth 1 --branch "$FLUTTER_VERSION" https://github.com/flutter/flutter.git "$FLUTTER_ROOT"; \
+        [ "$(git -C "$FLUTTER_ROOT" rev-parse HEAD)" = "$commit" ] \
+            || { echo "Flutter tag $FLUTTER_VERSION is not commit $commit from the release manifest" >&2; exit 1; }; \
+    else \
+        curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/$archive" -o /tmp/flutter.tar.xz; \
+        printf '%s  %s\n' "$sha" /tmp/flutter.tar.xz > /tmp/flutter.sha256; \
+        sha256sum -c /tmp/flutter.sha256; \
+        tar -xJf /tmp/flutter.tar.xz -C /sdks; \
+        rm -f /tmp/flutter.tar.xz /tmp/flutter.sha256; \
+    fi; \
+    rm -f "$manifest"; \
     git config --system --add safe.directory '*'; \
     flutter precache --web; \
     flutter --version

@@ -70,6 +70,7 @@ jobs:
       version: ${{ needs.versions.outputs.flutter }}
       context: docker/flutter-image
       build_args: FLUTTER_VERSION=${{ needs.versions.outputs.flutter }}
+      platforms: linux/amd64,linux/arm64
       description: "Flutter SDK (stable, web) on Ubuntu 24.04 - ready-to-use Docker image for GitHub Actions CI and Coolify/Docker builds. Tags: X.Y.Z, X.Y, latest"
       versions: |
         Flutter=flutter --version | head -1
@@ -80,8 +81,9 @@ jobs:
       publish: ${{ needs.versions.outputs.publish == 'true' }}
       floating_tags: ${{ needs.versions.outputs.floating == 'true' }}
 
-  # The Flutter-based images stay linux/amd64: Google publishes the Flutter SDK for Linux only as x86_64 (no arm64 archive in
-  # releases_linux.json), and the Android NDK has only a linux-x86_64 host toolchain. An arm64 variant would be a broken image.
+  # flutter and flutter-rust are multi-arch. Google publishes no Linux arm64 SDK archive, so the arm64 variant of flutter is
+  # built from the Flutter git tag (commit checked against the release manifest). flutter-linux and flutter-android stay
+  # linux/amd64: the Android NDK has only a linux-x86_64 host toolchain, and the desktop image has no arm64 consumer.
 
   # Builds FROM the published flutter image, so it only runs when that one was pushed. In pull requests the `rust` job
   # validates the same Dockerfile.
@@ -96,6 +98,7 @@ jobs:
       context: docker/rust-image
       base_image_name: flutter
       build_args: WITH_APP_TOOLS=true
+      platforms: linux/amd64,linux/arm64
       description: "Flutter + Rust (stable, pinned nightly, wasm32), flutter_rust_bridge_codegen, wasm-pack, wasm-opt and protoc - Docker image for Flutter web/WASM CI with native Rust. Tags: X.Y.Z, X.Y, latest"
       versions: |
         Flutter=flutter --version | head -1
