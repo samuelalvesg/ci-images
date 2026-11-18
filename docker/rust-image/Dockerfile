@@ -23,6 +23,7 @@ ARG PROTOC_PLUGIN_VERSION=21.1.2
 # flutter_rust_bridge 2.13 so the externref table export pointed at the function table, and the web app could not start its Rust core.
 ARG BINARYEN_VERSION=117
 ARG BINARYEN_SHA256=3dc677006555b355ea2da5e82602065a161d5e83eaefd3f759afa00b96e83212
+ARG BINARYEN_SHA256_AARCH64=ad560204426015a815faa45693c83bef7d58677d38a39422c272a30ba4b6da2a
 
 # System-wide locations: GitHub Actions swaps HOME, so nothing may live under /root or $HOME.
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -52,12 +53,19 @@ RUN set -eu; \
 
 # wasm-opt (binaryen) is used by wasm-pack, which otherwise downloads it on every run.
 # protoc_plugin is pinned to the line that matches protobuf ^3.1.0 used by the app's gRPC client.
+# TARGETARCH is set by buildx for each platform; Binaryen publishes one tarball per architecture, each with its own hash.
+ARG TARGETARCH
 RUN set -eu; [ "$WITH_APP_TOOLS" = "true" ] || exit 0; \
+    case "${TARGETARCH:-amd64}" in \
+        amd64) binaryen_arch=x86_64; binaryen_sha="$BINARYEN_SHA256" ;; \
+        arm64) binaryen_arch=aarch64; binaryen_sha="$BINARYEN_SHA256_AARCH64" ;; \
+        *) echo "no Binaryen build for ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
     apt-get update && apt-get install -y --no-install-recommends protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*; \
     curl --proto '=https' --tlsv1.2 -fsSL -o /tmp/binaryen.tar.gz \
-        "https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz"; \
-    echo "${BINARYEN_SHA256}  /tmp/binaryen.tar.gz" | sha256sum -c -; \
+        "https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/binaryen-version_${BINARYEN_VERSION}-${binaryen_arch}-linux.tar.gz"; \
+    echo "${binaryen_sha}  /tmp/binaryen.tar.gz" | sha256sum -c -; \
     mkdir -p /opt/binaryen && tar -xzf /tmp/binaryen.tar.gz -C /opt/binaryen --strip-components=1; \
     rm -f /tmp/binaryen.tar.gz; \
     ln -s /opt/binaryen/bin/wasm-opt /usr/local/bin/wasm-opt; \

@@ -80,6 +80,9 @@ jobs:
       publish: ${{ needs.versions.outputs.publish == 'true' }}
       floating_tags: ${{ needs.versions.outputs.floating == 'true' }}
 
+  # The Flutter-based images stay linux/amd64: Google publishes the Flutter SDK for Linux only as x86_64 (no arm64 archive in
+  # releases_linux.json), and the Android NDK has only a linux-x86_64 host toolchain. An arm64 variant would be a broken image.
+
   # Builds FROM the published flutter image, so it only runs when that one was pushed. In pull requests the `rust` job
   # validates the same Dockerfile.
   flutter-rust:
@@ -171,6 +174,7 @@ jobs:
       name: rust
       version: "1.0.0"
       context: docker/rust-image
+      platforms: linux/amd64,linux/arm64
       description: "Rust (stable + pinned nightly, wasm32, clippy, rustfmt), flutter_rust_bridge_codegen and wasm-pack preinstalled - Docker image for Rust/WASM CI. Tags: 1.0.0, 1.0, latest"
       versions: |
         Rust (stable)=rustc --version
@@ -189,6 +193,7 @@ jobs:
       name: dotnet
       version: ${{ needs.versions.outputs.dotnet }}.0
       context: docker/dotnet-image
+      platforms: linux/amd64,linux/arm64
       build_args: DOTNET_VERSION=${{ needs.versions.outputs.dotnet }}
       description: ".NET SDK (10.0) with dotnet-ef, python3 and jq preinstalled - Docker image for ASP.NET/EF Core CI on GitHub Actions. Tags: X.Y.Z, X.Y, latest"
       versions: |

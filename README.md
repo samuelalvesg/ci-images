@@ -19,7 +19,13 @@ e como `FROM` de qualquer Dockerfile (Coolify, Docker, Podman).
 `X.Y-sha-<commit>` identifica o commit de origem. Para build reproduzível, use o digest:
 `ghcr.io/samuelalvesg/flutter@sha256:...`.
 
-**Arquitetura:** `linux/amd64`.
+**Arquitetura:** `rust` e `dotnet` são multi-arquitetura (`linux/amd64` e `linux/arm64`), então o mesmo tag roda em runners x86 e no
+servidor ARM (Ampere) do Coolify. `flutter`, `flutter-rust`, `flutter-linux` e `flutter-android` são só `linux/amd64`: o Google
+publica o SDK do Flutter para Linux apenas em x86_64, e o NDK do Android tem toolchain só para host x86_64. Uma variante arm64
+delas seria uma imagem quebrada, então não é publicada.
+
+As variantes arm64 são construídas com QEMU no runner amd64 (mais lentas). Depois de publicar, o job verifica que as plataformas
+pedidas estão no manifesto e que a variante arm64 inicia. Os testes de fumaça completos rodam só em amd64.
 
 **Qual imagem para qual plataforma do Flutter**
 
