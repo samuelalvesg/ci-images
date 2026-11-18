@@ -19,7 +19,23 @@ e como `FROM` de qualquer Dockerfile (Coolify, Docker, Podman).
 `X.Y-sha-<commit>` identifica o commit de origem. Para build reproduzível, use o digest:
 `ghcr.io/samuelalvesg/flutter@sha256:...`.
 
-**Arquitetura:** `linux/amd64`.
+**Arquitetura:** `rust` e `dotnet` são multi-arquitetura (`linux/amd64` e `linux/arm64`), então o mesmo tag roda em runners x86 e no
+servidor ARM (Ampere) do Coolify. `flutter`, `flutter-rust`, `flutter-linux` e `flutter-android` são só `linux/amd64`: o Google
+publica o SDK do Flutter para Linux apenas em x86_64, e o NDK do Android tem toolchain só para host x86_64. Uma variante arm64
+delas seria uma imagem quebrada, então não é publicada.
+
+As variantes arm64 são construídas com QEMU no runner amd64 (mais lentas). Depois de publicar, o job verifica que as plataformas
+pedidas estão no manifesto e que a variante arm64 inicia. Os testes de fumaça completos rodam só em amd64.
+
+**App com Flutter num servidor ARM.** A imagem Flutter não roda em arm64, então o Dockerfile da aplicação precisa:
+
+- pôr o estágio que roda o Flutter em `FROM --platform=$BUILDPLATFORM ghcr.io/samuelalvesg/flutter-rust:<versão>` (ou `flutter`).
+  Num build multi-arquitetura, esse estágio roda uma vez em amd64 e só a imagem final vira arm64;
+- usar bases multi-arquitetura na imagem final (`nginx:alpine`, `debian:bookworm-slim`, `node`, `dart`, `rust`);
+- ser publicado como imagem multi-arquitetura pelo CI. O servidor **puxa** essa imagem: buildar localmente no Ampere com esse
+  Dockerfile falha com `no matching manifest for linux/arm64`.
+
+Um `dart compile exe` no estágio final roda no alvo, porque o Dart não faz compilação cruzada; no CI ele sai sob QEMU.
 
 **Qual imagem para qual plataforma do Flutter**
 
